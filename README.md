@@ -37,7 +37,7 @@
 ### Çalıştırma (Kaynaktan)
 
 ```powershell
-git clone https://github.com/TARIKTR1099/OfficeSetupWizard.git
+git clone https://github.com/TARIKELER-TARNAK/OfficeSetupWizard.git
 cd OfficeSetupWizard
 python builder/office_setup_wizard.py
 ```
@@ -87,6 +87,6 @@ OfficeSetupWizard/
 
 ## 🤝 Katkıda Bulun
 
-Hata bildirimleri ve geliştirme önerileri için [Issues](https://github.com/TARIKTR1099/OfficeSetupWizard/issues) sayfasını kullanabilirsin.
+Hata bildirimleri ve geliştirme önerileri için [Issues](https://github.com/TARIKELER-TARNAK/OfficeSetupWizard/issues) sayfasını kullanabilirsin.
 
-**Yapan:** [Tarık Eler](https://github.com/TARIKTR1099) · ⭐ Beğendiysen yıldızlamayı unutma!
+**Yapan:** [Tarık Eler](https://github.com/TARIKELER-TARNAK) · ⭐ Beğendiysen yıldızlamayı unutma!
