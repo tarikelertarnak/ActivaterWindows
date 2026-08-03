@@ -1,88 +1,92 @@
-# Office Setup Wizard
+# ⚙️ Office Setup Wizard
 
-<div align="center">
+> **Microsoft Office LTSC Professional Plus 2024'ü tek tıkla kurun ve etkinleştirin.**
 
-[![Download OfficeSetupWizard.exe](https://img.shields.io/badge/Download-OfficeSetupWizard.exe-2ea44f?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/TARIKTR1099/OfficeSetupWizard/releases/latest/download/OfficeSetupWizard.exe)
+`Office Setup Wizard`, Office Deployment Tool'u (ODT) sararak kurulumu otomatikleştiren, kullanıcı dostu bir **Windows masaüstü uygulamasıdır**. Karmaşık XML yapılandırmalarıyla uğraşmadan, grafik arayüzden birkaç tıklamayla Office'i kurar.
 
-[![Release](https://img.shields.io/github/v/release/TARIKTR1099/OfficeSetupWizard)](https://github.com/TARIKTR1099/OfficeSetupWizard/releases/latest)
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-Windows-blue?style=flat-square" />
+  <img src="https://img.shields.io/badge/language-Python-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/UI-Tkinter-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
+</p>
 
-</div>
+---
 
-A Windows GUI tool that installs Microsoft Office **LTSC Professional Plus 2024**
-with a single click. It wraps the official Microsoft Office Deployment Tool (ODT)
-and adds an easy wizard for picking your language, apps and configuration.
+## ✨ Özellikler
 
-Built with Python + Tkinter and packaged as a standalone `.exe` with PyInstaller.
+| Özellik | Açıklama |
+|---|---|
+| ⚡ **Otomatik Kurulum** | Office LTSC Professional Plus 2024 - istediğin dilde tek tıkla kurulum |
+| 📄 **Özel Yapılandırma** | Kendi `Configuration.xml` dosyanı kullan (ileri düzey kullanıcılar) |
+| 🌍 **Dil Seçimi** | `tr-tr`, `en-us` vb. herhangi bir dil koduyla kurulum |
+| 🎨 **Aydınlık/Karanlık Tema** | Modern, tercihine göre değişen arayüz |
+| 🧾 **Etkinleştirme** | Kurulum sonrası isteğe bağlı aktivasyon (MAS) |
+| 📋 **Ayrıntılı Günlük** | Kurulum sürecini adım adım izleme ve hata kaydı |
+| 📥 **Otomatik İndirme** | Gerekli ODT dosyalarını ve yapılandırmayı kendi indirir |
 
-## Features
+---
 
-- **One-click install** — downloads and installs Office LTSC Professional Plus 2024
-- **Language picker** — type to filter; matching languages move to the top of the
-  dropdown while the full list stays visible below
-- **Custom configuration** — paste your own XML from
-  [config.office.com](https://config.office.com/deploymentsettings)
-- **Built-in editor** — tweak edition (64-bit), channel, apps, Visio/Project,
-  auto-activate and more before installing
-- **Smart reinstall** — detects an existing Office install and offers
-  uninstall & reinstall or activate-only
-- **Turkish & English UI**, light/dark/auto theme
-- **Activates Office (Ohook)** via Microsoft Activation Scripts after setup
+## 🚀 Kullanım
 
-## Requirements
+### Ön Koşullar
+- **Windows 10 / 11** (x64)
+- **Python 3.8+** (kaynaktan çalıştırmak için)
+- İnternet bağlantısı (Office dosyalarını indirmek için)
 
-- Windows 10/11 (64-bit)
-- Internet connection (Office files are downloaded from the Microsoft CDN)
-- Administrator rights (requested automatically via UAC)
+### Çalıştırma (Kaynaktan)
 
-## Usage
-
-Run `OfficeSetupWizard.exe` as administrator:
-
-1. Pick a setup mode
-   - **Automatic Setup** — choose your language, optionally edit advanced settings
-   - **Custom Configuration** — load your own XML file from config.office.com
-2. Click **Start Setup** and wait. Office is downloaded, installed and activated.
-
-## Building from source
-
-```
+```powershell
 git clone https://github.com/TARIKTR1099/OfficeSetupWizard.git
 cd OfficeSetupWizard
-powershell -ExecutionPolicy Bypass -File builder\build.ps1
+python builder/office_setup_wizard.py
 ```
 
-The build script:
+### Derleme (Standalone .exe)
 
-- installs `pyinstaller`
-- bundles the Office Deployment Tool files from `resources/`
-- outputs `OfficeSetupWizard.exe` to the repository root
+```powershell
+powershell -ExecutionPolicy Bypass -File builder/build.ps1
+```
 
-The `resources/` folder must contain the ODT files (`setup.exe` and
-`officedeploymenttool_20131-20090.exe`) downloaded from [aka.ms/odt](https://aka.ms/odt).
+Derlenen yürütülebilir dosya `dist/` klasöründe oluşur.
 
-## Project layout
+---
+
+## 🖱️ Kullanım Adımları
+
+1. **Kurulum Modu** seç: *Otomatik* (LTSC 2024) veya *Özel Configuration*
+2. Kurulum dilini seç (ör. `tr-tr`, `en-us`)
+3. **Kurulumu Başlat** butonuna bas
+4. Office indirilir, kurulur ve (istersen) etkinleştirilir ✅
+
+---
+
+## ⚠️ Sorumluluk Reddi
+
+- Bu araç resmi Microsoft araçları (ODT) üzerine kuruludur.
+- Aktivasyon özelliği, topluluk tarafından geliştirilen **Microsoft Activation Scripts (MAS)** projesini kullanır.
+- Lisanssız yazılım kullanımı ülkenizin yasalarına ve Microsoft kullanım koşullarına tabidir. Bu proje yalnızca eğitim ve kişisel kullanım amacıyla paylaşılmaktadır; kullanım sorumluluğu tamamen kullanıcıya aittir.
+
+---
+
+## 📦 Proje Yapısı
 
 ```
 OfficeSetupWizard/
 ├── builder/
-│   ├── office_setup_wizard.py    # main source
-│   ├── office_setup_wizard.spec  # PyInstaller spec (relative paths)
-│   ├── office_setup_wizard.ico   # application icon
-│   ├── build.ps1                 # one-command build script
-│   ├── version_info.txt          # EXE version metadata
-│   └── icons/                    # theme icons (light/dark)
-├── resources/
-│   ├── setup.exe                 # Office Deployment Tool
-│   ├── officedeploymenttool_20131-20090.exe
-│   ├── Configuration.xml         # default install configuration
-│   └── configuration-Office365-x64.xml
-└── OfficeSetupWizard.exe         # build output (generated)
+│   ├── build.ps1            # .exe derleme betiği
+│   ├── office_setup_wizard.py  # Ana uygulama
+│   ├── office_setup_wizard.spec # PyInstaller spec
+│   └── icons/               # Uygulama simgeleri
+└── resources/
+    ├── Configuration.xml    # Örnek yapılandırma
+    └── ...
 ```
 
-## License
+---
 
-This project uses the [Microsoft Office Deployment Tool](https://aka.ms/odt) and
-[Microsoft Activation Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts).
-You are responsible for complying with Microsoft licensing terms for Office and
-for your own use of activation scripts. Distributing Office binaries may be
-restricted; please review the Microsoft Software License Terms.
+## 🤝 Katkıda Bulun
+
+Hata bildirimleri ve geliştirme önerileri için [Issues](https://github.com/TARIKTR1099/OfficeSetupWizard/issues) sayfasını kullanabilirsin.
+
+**Yapan:** [Tarık Eler](https://github.com/TARIKTR1099) · ⭐ Beğendiysen yıldızlamayı unutma!
