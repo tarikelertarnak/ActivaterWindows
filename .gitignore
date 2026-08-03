@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# PyInstaller build artifacts
+builder/build/
+builder/dist/
+
+# Built installer output
+/OfficeSetupWizard.exe
+
+# Debug log
+oi_debug.log
