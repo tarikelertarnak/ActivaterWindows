@@ -1,5 +1,13 @@
 # Office Setup Wizard
 
+<div align="center">
+
+[![Download OfficeSetupWizard.exe](https://img.shields.io/badge/Download-OfficeSetupWizard.exe-2ea44f?style=for-the-badge&logo=windows11&logoColor=white)](https://github.com/TARIKTR1099/OfficeSetupWizard/releases/latest/download/OfficeSetupWizard.exe)
+
+[![Release](https://img.shields.io/github/v/release/TARIKTR1099/OfficeSetupWizard)](https://github.com/TARIKTR1099/OfficeSetupWizard/releases/latest)
+
+</div>
+
 A Windows GUI tool that installs Microsoft Office **LTSC Professional Plus 2024**
 with a single click. It wraps the official Microsoft Office Deployment Tool (ODT)
 and adds an easy wizard for picking your language, apps and configuration.
