@@ -449,6 +449,45 @@ def open_url(url):
         webbrowser.open(url)
 
 
+def download_with_retry(url, max_retries=3, timeout=60, delay=5):
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except Exception as exc:
+            last_err = exc
+            if attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))
+    raise last_err
+
+
+def validate_config_xml(xml_content):
+    try:
+        root = ET.fromstring(xml_content)
+        if root.tag != "Configuration":
+            return False
+        add = root.find("Add")
+        if add is None:
+            return False
+        if not add.get("OfficeClientEdition"):
+            return False
+        products = add.findall("Product")
+        if not products:
+            return False
+        for prod in products:
+            if not prod.get("ID"):
+                return False
+            langs = prod.findall("Language")
+            if not langs:
+                return False
+        return True
+    except ET.ParseError:
+        return False
+
+
 def oem_decode(data):
     try:
         cp = ctypes.windll.kernel32.GetOEMCP()
@@ -565,6 +604,7 @@ class SHELLEXECUTEINFOW(ctypes.Structure):
 
 def spawn_elevated(params):
     try:
+        dlog("spawn_elevated: file=%s params=%s" % (sys.executable, params[:200]))
         sei = SHELLEXECUTEINFOW()
         sei.cbSize = ctypes.sizeof(SHELLEXECUTEINFOW)
         sei.fMask = SEE_MASK_NOCLOSEPROCESS
@@ -573,9 +613,13 @@ def spawn_elevated(params):
         sei.lpParameters = params
         sei.nShow = 0
         if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei)):
+            err = ctypes.windll.kernel32.GetLastError()
+            dlog("spawn_elevated: ShellExecuteExW failed, error=%d" % err)
             return None
+        dlog("spawn_elevated: success, hProcess=%s" % sei.hProcess)
         return sei.hProcess
-    except Exception:
+    except Exception as exc:
+        dlog("spawn_elevated: exception=%s" % exc)
         return None
 
 
@@ -942,9 +986,10 @@ class ConfigEditor:
 
 
 def ps_argv(cmd, *args):
-    quoted = " ".join("'%s'" % a.replace("'", "''") for a in (cmd,) + args)
+    all_args = (cmd,) + args
+    cmd_str = " ".join('"%s"' % a.replace('"', '`"') for a in all_args)
     return ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-Command", "& " + quoted + "; exit $LASTEXITCODE"]
+            "-Command", "& { %s }; exit $LASTEXITCODE" % cmd_str]
 
 
 class Installer:
@@ -998,7 +1043,7 @@ class Installer:
                 xml = re.sub(r'<Language ID="[^"]*"\s*/>',
                              '<Language ID="%s" />' % lang_sel, xml)
 
-            if "<Configuration" not in xml:
+            if not validate_config_xml(xml):
                 raise RuntimeError(self.t("custom_invalid"))
 
             if "<Display " not in xml:
@@ -1008,8 +1053,14 @@ class Installer:
                     xml, count=1)
 
             cfg_path = os.path.join(workdir, "configuration.xml")
-            with open(cfg_path, "w", encoding="utf-8") as f:
-                f.write(xml)
+            try:
+                with open(cfg_path, "w", encoding="utf-8") as f:
+                    f.write(xml)
+                if not os.path.isfile(cfg_path) or os.path.getsize(cfg_path) == 0:
+                    raise RuntimeError("Failed to write configuration.xml")
+                self.log("> Configuration written to: %s (%d bytes)" % (cfg_path, os.path.getsize(cfg_path)))
+            except Exception as exc:
+                raise RuntimeError("Failed to create configuration.xml: %s" % exc)
 
         if decision == "reinstall":
             uninst = os.path.join(workdir, "uninstall.xml")
@@ -1026,13 +1077,33 @@ class Installer:
             inst_start = 45 if decision == "reinstall" else 12
             self.post(self.t("st_inst_start"), inst_start)
             self.log(self.t("st_inst_start"))
+            self.log("> setup.exe: %s" % setup_dst)
+            if not os.path.isfile(setup_dst):
+                raise RuntimeError("setup.exe not found at: %s" % setup_dst)
+            if not cfg_path or not os.path.isfile(cfg_path):
+                raise RuntimeError("configuration.xml not found at: %s" % (cfg_path or "None"))
+            self.log("> configuration.xml: %s" % cfg_path)
             code = self._run_ticked(
-                ps_argv(setup_dst, "/configure", "configuration.xml"), workdir,
-                inst_start, 78, self.t("st_inst"))
+                ps_argv(setup_dst, "/configure", cfg_path),
+                workdir, inst_start, 78, self.t("st_inst"))
             if code != 0:
+                hints = []
+                if code == 4294967295:
+                    hints.append("This error often means the setup process could not start.")
+                    hints.append("Check if antivirus is blocking the installation.")
+                    hints.append("Try running the application as administrator.")
+                elif code == 3010:
+                    hints.append("Installation completed but requires a restart.")
+                elif code == 1706:
+                    hints.append("No network connection available. Check your internet.")
+                hint_text = "\n".join(hints) if hints else ""
                 raise RuntimeError(
-                    "Office install failed (code: %d). Check your internet "
-                    "connection and try again." % code)
+                    "Office install failed (code: %d).\n\nPossible causes:\n"
+                    "- No internet connection\n"
+                    "- Antivirus blocking the installation\n"
+                    "- Insufficient disk space\n"
+                    "%s\n"
+                    "Check your internet connection and try again." % (code, hint_text))
 
         self.post(self.t("st_act_dl"), 85)
         self._activate()
@@ -1046,9 +1117,14 @@ class Installer:
         msg = msgs[0] if isinstance(msgs, list) else str(msgs)
         self.post(msg, start)
         self.log("> %s" % " ".join(args))
-        proc = subprocess.Popen(
-            args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            env=env, creationflags=CREATE_NO_WINDOW)
+        self.log("> cwd: %s" % cwd)
+        try:
+            proc = subprocess.Popen(
+                args, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=env, creationflags=CREATE_NO_WINDOW)
+        except OSError as exc:
+            self.log("> failed to start process: %s" % exc)
+            raise RuntimeError("Could not start process: %s" % exc)
         stop = threading.Event()
 
         expected = 120 if "uninstall" in " ".join(args).lower() else 600
@@ -1094,10 +1170,8 @@ class Installer:
 
     def _activate(self):
         self.post(self.t("st_act_dl"), 87)
-        req = urllib.request.Request(MAS_URL, headers={"User-Agent": "Mozilla/5.0"})
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = resp.read()
+            data = download_with_retry(MAS_URL, max_retries=3, timeout=60, delay=5)
         except Exception as exc:
             raise RuntimeError(
                 "Activation script could not be downloaded: %s\n\nOffice is "
