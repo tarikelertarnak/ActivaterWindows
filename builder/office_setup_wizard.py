@@ -20,17 +20,13 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import xml.etree.ElementTree as ET
 
-APP_TITLE = "Office Setup Wizard"
-APP_VERSION = "2.0.0"
+APP_TITLE = "ActivatePro"
+APP_VERSION = "3.0.0"
 
 CREATE_NO_WINDOW = 0x08000000
 STILL_ACTIVE = 259
 SEE_MASK_NOCLOSEPROCESS = 0x00000040
 
-MAS_URL = (
-    "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/"
-    "f34d025d5102a790c75c839c8d46b672284729a5/MAS/All-In-One-Version-KL/MAS_AIO.cmd"
-)
 MAS_HASH = "850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA"
 
 ODT_VERSION = "20228-20124"
@@ -54,7 +50,7 @@ def check_internet(timeout=5):
         req = urllib.request.Request(
             "https://config.office.com/deploymentsettings",
             method="HEAD",
-            headers={"User-Agent": "OfficeSetupWizard/%s" % APP_VERSION})
+            headers={"User-Agent": "ActivatePro/%s" % APP_VERSION})
         urllib.request.urlopen(req, timeout=timeout)
         return True
     except Exception:
@@ -103,8 +99,39 @@ PALETTES = {
 
 I18N = {
     "tr": {
-        "title": "Office Setup Wizard",
-        "banner": "Office Setup Wizard",
+        "title": "ActivatePro",
+        "banner": "ActivatePro",
+        "tab_install": "Office Kurulumu",
+        "tab_activate": "Aktivasyon",
+        "act_frame": "Windows / Office / ESU Aktivasyonu",
+        "act_pick": "Aktivasyon Türü:",
+        "act_hwid": "Windows 10/11 — Kalıcı (HWID, dijital lisans)",
+        "act_tsforge": "Windows 7-11 + Server — Kalıcı (TSforge)",
+        "act_esu": "Windows 10 ESU — TSforge (kalıcı)",
+        "act_ohook": "Office LTSC/365 — Kalıcı (Ohook)",
+        "act_kms_all": "Windows + Office — 180 Gün (Online KMS)",
+        "act_kms_windows": "Windows — 180 Gün (Online KMS)",
+        "act_kms_office": "Office — 180 Gün (Online KMS)",
+        "act_all": "Hepsi — Windows + ESU + Office (TSforge)",
+        "act_ohook_rm": "Ohook Kaldır (Office)",
+        "act_kms_rm": "Online KMS Kaldır (tümü)",
+        "act_desc_hwid": "Windows 10/11 için dijital lisans (kalıcı, Microsoft hesabına bağlanır). İnternet gerekir.",
+        "act_desc_tsforge": "Windows 7/8/10/11 ve Server sürümleri için kalıcı aktivasyon. İnternet gerekmez.",
+        "act_desc_esu": "Windows 10 için Extended Security Updates (ESU) aktivasyonu, kalıcı.",
+        "act_desc_ohook": "Office LTSC 2024 / 2021 / MS365 için kalıcı aktivasyon (lisans dosyası hook'u). İnternet gerekmez.",
+        "act_desc_kms_all": "Windows ve Office için 180 günlük KMS aktivasyonu; süre bitince yeniden çalıştırın (oto-yenileme görevi kurulur).",
+        "act_desc_kms_windows": "Windows için 180 günlük KMS aktivasyonu (oto-yenileme görevi kurulur).",
+        "act_desc_kms_office": "Office için 180 günlük KMS aktivasyonu (oto-yenileme görevi kurulur).",
+        "act_desc_all": "Windows, ESU ve Office'i tek seferde TSforge ile kalıcı aktive eder.",
+        "act_desc_ohook_rm": "Ohook ile aktive edilmiş Office lisansını geri alır (orijinal lisans durumuna döner).",
+        "act_desc_kms_rm": "Kurulmuş Online KMS yenileme görevini ve lisansları kaldırır.",
+        "act_run": "Aktive Et",
+        "act_check": "Aktivasyon Durumunu Kontrol Et",
+        "act_running": "Aktivasyon çalıştırılıyor...",
+        "act_done": "Aktivasyon işlemi tamamlandı. Durum kontrolü ile doğrulayın.",
+        "act_checking": "Aktivasyon durumu kontrol ediliyor...",
+        "act_check_done": "Aktivasyon durumu kontrol edildi. Ayrıntılar aşağıdaki günlükte.",
+        "act_need_admin": "Aktivasyon için yönetici yetkisi gerekir.",
         "mode_frame": "Kurulum Modu",
         "mode_auto": "Otomatik Kurulum: Office LTSC Professional Plus 2024 — Seçtiğin Dil",
         "mode_custom": "Özel Configuration (kendi XML dosyam)",
@@ -163,7 +190,7 @@ I18N = {
         "uac_retry": "Yönetici onayı verilmedi. Kurulum için yönetici izni gerekiyor.\nTekrar denensin mi?",
         "res_missing_title": "Eksik Kurulum Dosyası",
         "res_missing_msg": "Gerekli kurulum dosyası (setup.exe) bulunamadı.\n\nsetup.exe, Office Deployment Tool'un parçasıdır ve Office kurulumunu başlatır. Dosya silinmiş ya da dağıtılan sürümde eksik olabilir.\n\nAşağıdan bu dosyaların bulunduğu klasörü seçerek devam edebilirsiniz.",
-        "res_missing_where": "Dosyaları şu konumlara da koyabilirsiniz:\n- {TEMP}\n- OfficeSetupWizard.exe'nin yanına\n\nsetup.exe, aka.ms/odt adresinden indirilen 'officedeploymenttool_20131-20090.exe' zip dosyasının içinden çıkarılır.",
+        "res_missing_where": "Dosyaları şu konumlara da koyabilirsiniz:\n- {TEMP}\n- ActivatePro.exe'nin yanına\n\nsetup.exe, aka.ms/odt adresinden indirilen 'officedeploymenttool_20131-20090.exe' zip dosyasının içinden çıkarılır.",
         "res_use": "Klasörü Seç ve Devam Et",
         "res_invalid": "Seçilen klasörde setup.exe bulunamadı.\nOffice Deployment Tool dosyalarının bulunduğu klasörü seçin.",
         "helper_failed": "Arka plan işlemi beklenmedik şekilde sonlandı.",
@@ -193,13 +220,44 @@ I18N = {
         "odt_dl_fail": "ODT indirilemedi. Lütfen setup.exe dosyasını manuel olarak yerleştirin.",
         "about_title": "Hakkında",
         "about_ver": "Sürüm: %s",
-        "about_info": "Office Setup Wizard — Microsoft Office LTSC 2024'ü tek tıkla kurun.",
+        "about_info": "ActivatePro — Microsoft Office LTSC 2024'ü tek tıkla kurun; Windows, Office ve ESU'yu aktive edin.",
         "about_mas": "Aktivasyon: Microsoft Activation Scripts (MAS) v3.12",
         "about_odt": "Dağıtım Aracı: Office Deployment Tool (ODT) %s",
     },
     "en": {
-        "title": "Office Setup Wizard",
-        "banner": "Office Setup Wizard",
+        "title": "ActivatePro",
+        "banner": "ActivatePro",
+        "tab_install": "Office Setup",
+        "tab_activate": "Activation",
+        "act_frame": "Windows / Office / ESU Activation",
+        "act_pick": "Activation Type:",
+        "act_hwid": "Windows 10/11 — Permanent (HWID, digital license)",
+        "act_tsforge": "Windows 7-11 + Server — Permanent (TSforge)",
+        "act_esu": "Windows 10 ESU — TSforge (permanent)",
+        "act_ohook": "Office LTSC/365 — Permanent (Ohook)",
+        "act_kms_all": "Windows + Office — 180 Days (Online KMS)",
+        "act_kms_windows": "Windows — 180 Days (Online KMS)",
+        "act_kms_office": "Office — 180 Days (Online KMS)",
+        "act_all": "Everything — Windows + ESU + Office (TSforge)",
+        "act_ohook_rm": "Uninstall Ohook (Office)",
+        "act_kms_rm": "Uninstall Online KMS (all)",
+        "act_desc_hwid": "Digital license for Windows 10/11 (permanent, linked to Microsoft account). Internet required.",
+        "act_desc_tsforge": "Permanent activation for Windows 7/8/10/11 and Server editions. No internet required.",
+        "act_desc_esu": "Extended Security Updates (ESU) activation for Windows 10, permanent.",
+        "act_desc_ohook": "Permanent activation for Office LTSC 2024 / 2021 / MS365 (license file hook). No internet required.",
+        "act_desc_kms_all": "180-day KMS activation for Windows and Office; re-run when it expires (auto-renewal task is installed).",
+        "act_desc_kms_windows": "180-day KMS activation for Windows (auto-renewal task installed).",
+        "act_desc_kms_office": "180-day KMS activation for Office (auto-renewal task installed).",
+        "act_desc_all": "Activates Windows, ESU and Office all at once with TSforge, permanently.",
+        "act_desc_ohook_rm": "Reverts Ohook-activated Office licenses back to their original state.",
+        "act_desc_kms_rm": "Removes installed Online KMS renewal task and licenses.",
+        "act_run": "Activate",
+        "act_check": "Check Activation Status",
+        "act_running": "Running activation...",
+        "act_done": "Activation finished. Verify with the status check.",
+        "act_checking": "Checking activation status...",
+        "act_check_done": "Activation status checked. See details in the log below.",
+        "act_need_admin": "Administrator rights are required for activation.",
         "mode_frame": "Setup Mode",
         "mode_auto": "Automatic Setup: Office LTSC Professional Plus 2024 — Your Language",
         "mode_custom": "Custom Configuration (my own XML file)",
@@ -258,7 +316,7 @@ I18N = {
         "uac_retry": "Administrator approval was not granted. Setup requires administrator rights.\nTry again?",
         "res_missing_title": "Missing Setup File",
         "res_missing_msg": "The required setup file (setup.exe) could not be found.\n\nsetup.exe is part of the Office Deployment Tool and starts the Office installation. It may have been deleted or be missing from the distributed build.\n\nYou can continue by selecting a folder that contains these files below.",
-        "res_missing_where": "You can also place the files here:\n- {TEMP}\n- Next to OfficeSetupWizard.exe\n\nsetup.exe is extracted from the 'officedeploymenttool_20131-20090.exe' zip downloaded from aka.ms/odt.",
+        "res_missing_where": "You can also place the files here:\n- {TEMP}\n- Next to ActivatePro.exe\n\nsetup.exe is extracted from the 'officedeploymenttool_20131-20090.exe' zip downloaded from aka.ms/odt.",
         "res_use": "Select Folder & Continue",
         "res_invalid": "setup.exe was not found in the selected folder.\nPlease select a folder that contains the Office Deployment Tool files.",
         "helper_failed": "The background process ended unexpectedly.",
@@ -288,7 +346,7 @@ I18N = {
         "odt_dl_fail": "ODT download failed. Please place setup.exe manually.",
         "about_title": "About",
         "about_ver": "Version: %s",
-        "about_info": "Office Setup Wizard — Install Microsoft Office LTSC 2024 with one click.",
+        "about_info": "ActivatePro — One-click Microsoft Office LTSC 2024 setup; activate Windows, Office and ESU.",
         "about_mas": "Activation: Microsoft Activation Scripts (MAS) v3.12",
         "about_odt": "Deployment Tool: Office Deployment Tool (ODT) %s",
     },
@@ -356,6 +414,20 @@ OFFICE_CHANNELS = ["PerpetualVL2024", "PerpetualVL2021", "Current",
 
 DEFAULT_APPS = {"Excel", "PowerPoint", "Word"}
 
+# Activation methods: (i18n key, MAS flag)
+ACT_METHODS = [
+    ("act_hwid", "/HWID"),
+    ("act_tsforge", "/Z-Windows"),
+    ("act_esu", "/Z-ESU"),
+    ("act_ohook", "/Ohook"),
+    ("act_kms_all", "/K-WindowsOffice"),
+    ("act_kms_windows", "/K-Windows"),
+    ("act_kms_office", "/K-Office"),
+    ("act_all", "/Z-WindowsESUOffice"),
+    ("act_ohook_rm", "/Ohook-Uninstall"),
+    ("act_kms_rm", "/K-Uninstall"),
+]
+
 
 def resolve_lang_code(raw):
     low = (raw or "").strip().lower()
@@ -399,8 +471,94 @@ def resource_path(name):
     return os.path.join(base, name)
 
 
+def _embedded_script_bytes(rel):
+    """Return the embedded script bytes from resources/, verifying MAS hash."""
+    src = find_resource(rel) or resource_path(rel)
+    if not os.path.isfile(src):
+        # dev-mode fallback: <project>/resources/mas/...
+        alt = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))), "resources", rel)
+        if os.path.isfile(alt):
+            src = alt
+    if not os.path.isfile(src):
+        raise RuntimeError("Embedded script missing: %s" % rel)
+    with open(src, "rb") as f:
+        data = f.read()
+    if rel == "mas/MAS_AIO.cmd":
+        digest = hashlib.sha256(data).hexdigest().upper()
+        if digest != MAS_HASH:
+            raise RuntimeError(
+                "Activation script failed verification (hash mismatch).")
+    return data
+
+
+def _run_script_cmd(script, log, args="", timeout=900, stdin_devnull=False):
+    """Run a .cmd script via hidden PowerShell, streaming output to log."""
+    env = dict(os.environ)
+    for key in ("WT_SESSION", "WT_PROFILE_ID", "TERM_PROGRAM",
+                "TERM_PROGRAM_VERSION", "TERMINAL_EMULATOR"):
+        env.pop(key, None)
+    inner = "cmd /c '%s' %s" % (script.replace("'", "''"), args)
+    cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+           "-Command", "& " + inner + "; exit $LASTEXITCODE"]
+    kwargs = {"cwd": tempfile.gettempdir(),
+              "stdout": subprocess.PIPE, "stderr": subprocess.STDOUT,
+              "env": env, "creationflags": CREATE_NO_WINDOW}
+    if stdin_devnull:
+        kwargs["stdin"] = subprocess.DEVNULL
+    proc = subprocess.Popen(cmd, **kwargs)
+
+    def reader():
+        for raw in iter(lambda: proc.stdout.readline(), b""):
+            line = oem_decode(raw).rstrip("\r\n")
+            if line.strip():
+                log(line)
+
+    threading.Thread(target=reader, daemon=True).start()
+    try:
+        proc.wait(timeout=timeout)
+        log("> exit code: %d" % proc.returncode)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        raise RuntimeError("Script timed out.")
+
+
+def run_mas(flag, log, timeout=900):
+    """Run the embedded MAS script with the given method flag (blocking)."""
+    data = _embedded_script_bytes("mas/MAS_AIO.cmd")
+    script = os.path.join(tempfile.gettempdir(),
+                          "MAS_%s.cmd" % uuid.uuid4().hex)
+    with open(script, "wb") as f:
+        f.write(data)
+    log("> %s (%d bytes)" % (os.path.basename(script), len(data)))
+    try:
+        _run_script_cmd(script, log, "-el -qedit %s" % flag, timeout=timeout)
+    finally:
+        try:
+            os.remove(script)
+        except OSError:
+            pass
+
+
+def run_check_activation(log, timeout=600):
+    """Run the embedded Check_Activation_Status.cmd (blocking)."""
+    data = _embedded_script_bytes("mas/Check_Activation_Status.cmd")
+    script = os.path.join(tempfile.gettempdir(),
+                          "CheckAct_%s.cmd" % uuid.uuid4().hex)
+    with open(script, "wb") as f:
+        f.write(data)
+    log("> %s (%d bytes)" % (os.path.basename(script), len(data)))
+    try:
+        _run_script_cmd(script, log, timeout=timeout, stdin_devnull=True)
+    finally:
+        try:
+            os.remove(script)
+        except OSError:
+            pass
+
+
 def temp_store_dir():
-    return os.path.join(tempfile.gettempdir(), "OfficeSetupWizard")
+    return os.path.join(tempfile.gettempdir(), "ActivatePro")
 
 
 def res_candidates(name):
@@ -594,7 +752,7 @@ def acquire_single_instance():
     global _mutex_handle
     try:
         _mutex_handle = ctypes.windll.kernel32.CreateMutexW(
-            None, False, "Local\\OfficeSetupWizard_SingleInstance")
+            None, False, "Local\\ActivatePro_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
             ctypes.windll.kernel32.CloseHandle(_mutex_handle)
             _mutex_handle = None
@@ -623,7 +781,7 @@ def focus_existing():
             if hproc:
                 buf = ctypes.create_unicode_buffer(260)
                 if psapi.GetModuleBaseNameW(hproc, None, buf, 260) and \
-                        buf.value.lower().startswith("officesetupwizard"):
+                        buf.value.lower().startswith("activatepro"):
                     found.append(hwnd)
                 kernel32.CloseHandle(hproc)
             return True
@@ -1226,55 +1384,15 @@ class Installer:
             stop.set()
 
     def _activate(self):
-        self.post(self.t("st_act_dl"), 87)
-        try:
-            data = download_with_retry(MAS_URL, max_retries=3, timeout=60, delay=5)
-        except Exception as exc:
-            raise RuntimeError(
-                "Activation script could not be downloaded: %s\n\nOffice is "
-                "installed but not activated. You can activate it manually:\n%s"
-                % (exc, self.t("err_installed_hint")))
-
-        digest = hashlib.sha256(data).hexdigest().upper()
-        if digest != MAS_HASH:
-            raise RuntimeError("Activation script failed verification (hash mismatch).")
-
-        script = os.path.join(tempfile.gettempdir(), "MAS_%s.cmd" % uuid.uuid4().hex)
-        with open(script, "wb") as f:
-            f.write(data)
-        self.log("> %s (%d bytes)" % (os.path.basename(script), len(data)))
+        self.log("> activation: embedded MAS script (MAS_AIO.cmd)")
         try:
             self.post(self.t("st_act"), 90)
-            env = dict(os.environ)
-            for key in ("WT_SESSION", "WT_PROFILE_ID", "TERM_PROGRAM",
-                        "TERM_PROGRAM_VERSION", "TERMINAL_EMULATOR"):
-                env.pop(key, None)
-            inner = "cmd /c '%s' -el -qedit /Ohook" % script.replace("'", "''")
-            cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                   "-Command", "& " + inner + "; exit $LASTEXITCODE"]
-            proc = subprocess.Popen(
-                cmd, cwd=tempfile.gettempdir(),
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                env=env, creationflags=CREATE_NO_WINDOW)
-
-            def reader():
-                for raw in iter(lambda: proc.stdout.readline(), b""):
-                    line = oem_decode(raw).rstrip("\r\n")
-                    if line.strip():
-                        self.log(line)
-
-            threading.Thread(target=reader, daemon=True).start()
-            try:
-                proc.wait(timeout=900)
-                self.log("> activation exit code: %d" % proc.returncode)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                raise RuntimeError("Activation timed out.")
-        finally:
-            try:
-                os.remove(script)
-            except OSError:
-                pass
+            run_mas("/Ohook", self.log, timeout=900)
+        except Exception as exc:
+            raise RuntimeError(
+                "Activation failed: %s\n\nOffice is installed but not "
+                "activated. You can activate it manually:\n%s"
+                % (exc, self.t("err_installed_hint")))
 
 
 def _write_json(logfile, obj):
@@ -1493,6 +1611,16 @@ class App:
                 pass
 
     def _build_body(self, parent):
+        self.notebook = ttk.Notebook(parent)
+        self.notebook.pack(fill="x", pady=(0, 10))
+        self.tab_install = ttk.Frame(self.notebook)
+        self.tab_activate = ttk.Frame(self.notebook)
+        self.notebook.add(self.tab_install, text=self.t("tab_install"))
+        self.notebook.add(self.tab_activate, text=self.t("tab_activate"))
+        self._build_activate_tab(self.tab_activate)
+
+        root_parent = parent
+        parent = self.tab_install
         mode_frame = ttk.LabelFrame(parent, text=self.t("mode_frame"), padding=10)
         mode_frame.pack(fill="x", pady=(0, 10))
         ttk.Radiobutton(mode_frame, text=self.t("mode_auto"),
@@ -1555,6 +1683,7 @@ class App:
         self.start_btn = ttk.Button(parent, text=self.t("start"), command=self._start)
         self.start_btn.pack(fill="x", pady=(0, 12))
 
+        parent = root_parent
         progress_frame = ttk.Frame(parent)
         progress_frame.pack(fill="x")
         self.progress = ttk.Progressbar(progress_frame, mode="determinate",
@@ -1721,6 +1850,95 @@ class App:
             self.install_lang_cb.configure(
                 state="disabled" if self.mode.get() == "custom" else "normal")
 
+    def _build_activate_tab(self, parent):
+        act_frame = ttk.LabelFrame(parent, text=self.t("act_frame"), padding=10)
+        act_frame.pack(fill="x", pady=(4, 0))
+
+        ttk.Label(act_frame, text=self.t("act_pick")).pack(anchor="w")
+        self.act_combo = ttk.Combobox(
+            act_frame, state="readonly",
+            values=[self.t(key) for key, _ in ACT_METHODS])
+        self.act_combo.current(0)
+        self.act_combo.pack(fill="x", pady=(4, 0))
+        self.act_combo.bind("<<ComboboxSelected>>", self._on_act_select)
+
+        self.act_desc_lbl = tk.Label(
+            act_frame, text=self.t(self._act_desc_key(ACT_METHODS[0][0])),
+            font=("Segoe UI", 8), fg=self.pal["hint"], bg=self.pal["bg"],
+            justify="left", wraplength=500, anchor="w")
+        self.act_desc_lbl.pack(fill="x", pady=(6, 0))
+
+        self.act_run_btn = ttk.Button(act_frame, text=self.t("act_run"),
+                                      command=self._start_activation)
+        self.act_run_btn.pack(fill="x", pady=(10, 6))
+        self.act_check_btn = ttk.Button(act_frame, text=self.t("act_check"),
+                                        command=self._check_activation)
+        self.act_check_btn.pack(fill="x")
+
+    def _act_desc_key(self, method_key):
+        return "act_desc_" + method_key[4:]  # act_hwid -> act_desc_hwid
+
+    def _on_act_select(self, _event=None):
+        idx = self.act_combo.current()
+        if 0 <= idx < len(ACT_METHODS):
+            self.act_desc_lbl.configure(
+                text=self.t(self._act_desc_key(ACT_METHODS[idx][0])))
+
+    def _selected_act_flag(self):
+        idx = self.act_combo.current()
+        if 0 <= idx < len(ACT_METHODS):
+            return ACT_METHODS[idx][1]
+        return ACT_METHODS[0][1]
+
+    def _start_activation(self):
+        if self.running:
+            return
+        self.running = True
+        self._set_running_ui(True)
+        self.status_var.set(self.t("act_running"))
+        flag = self._selected_act_flag()
+        threading.Thread(
+            target=self._worker_activation, args=(flag,), daemon=True).start()
+
+    def _worker_activation(self, flag):
+        def post(msg, pct):
+            self.queue.put(("status", msg, pct))
+
+        def log(line):
+            self.queue.put(("log", line, None))
+
+        try:
+            run_mas(flag, log, timeout=900)
+            post(self.t("act_done"), 100)
+        except Exception as exc:
+            post("%s" % exc, 100)
+        finally:
+            self.queue.put(("finished", None, None))
+
+    def _check_activation(self):
+        if self.running:
+            return
+        self.running = True
+        self._set_running_ui(True)
+        self.status_var.set(self.t("act_checking"))
+        threading.Thread(target=self._worker_check_activation,
+                         daemon=True).start()
+
+    def _worker_check_activation(self):
+        def post(msg, pct):
+            self.queue.put(("status", msg, pct))
+
+        def log(line):
+            self.queue.put(("log", line, None))
+
+        try:
+            run_check_activation(log, timeout=600)
+            post(self.t("act_check_done"), 100)
+        except Exception as exc:
+            post("%s" % exc, 100)
+        finally:
+            self.queue.put(("finished", None, None))
+
     def _browse(self):
         path = filedialog.askopenfilename(
             title=self.t("mode_custom"),
@@ -1818,7 +2036,7 @@ class App:
             decision = "install"
 
         self.running = True
-        self.start_btn.configure(state="disabled")
+        self._set_running_ui(True)
         self._layout()
         self.status_var.set("")
         self.progress.stop()
@@ -2031,6 +2249,17 @@ class App:
         self.log_text.configure(state="disabled")
         self.log_text.see("end")
 
+    def _set_running_ui(self, on):
+        state = "disabled" if on else "normal"
+        if hasattr(self, "start_btn"):
+            self.start_btn.configure(state=state)
+        if hasattr(self, "act_run_btn"):
+            self.act_run_btn.configure(state=state)
+        if hasattr(self, "act_check_btn"):
+            self.act_check_btn.configure(state=state)
+        if hasattr(self, "act_combo"):
+            self.act_combo.configure(state=state if not on else "disabled")
+
     def _poll_queue(self):
         try:
             while True:
@@ -2046,10 +2275,13 @@ class App:
                     self.pct_var.set("%d%%" % pct)
                 elif item[0] == "log":
                     self._append_log(item[1])
+                elif item[0] == "finished":
+                    self.running = False
+                    self._set_running_ui(False)
                 elif item[0] == "done":
                     _, kind, text = item
                     self.running = False
-                    self.start_btn.configure(state="normal")
+                    self._set_running_ui(False)
                     self._layout()
                     if kind == "error":
                         self.progress.stop()
@@ -2125,7 +2357,46 @@ class App:
         if self.running:
             messagebox.showinfo(APP_TITLE, self.t("close_blocked"))
             return
+        cleanup_temp_files()
         self.root.destroy()
+
+
+def cleanup_temp_files():
+    """Remove all temp files created by ActivatePro — zero residue."""
+    temp = tempfile.gettempdir()
+    patterns = [
+        os.path.join(temp, "ActivatePro"),
+        os.path.join(temp, "OfficeInstaller_*"),
+        os.path.join(temp, "oi_debug.log"),
+        os.path.join(temp, "office_config.xml"),
+    ]
+    for pat in patterns:
+        if "*" in pat:
+            import glob as _glob
+            for p in _glob.glob(pat):
+                try:
+                    if os.path.isdir(p):
+                        shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        os.remove(p)
+                except OSError:
+                    pass
+        else:
+            try:
+                if os.path.isdir(pat):
+                    shutil.rmtree(pat, ignore_errors=True)
+                elif os.path.isfile(pat):
+                    os.remove(pat)
+            except OSError:
+                pass
+    # Also clean ActivatePro_* installer temp dirs
+    for d in os.listdir(temp):
+        full = os.path.join(temp, d)
+        if d.startswith("ActivatePro_") and os.path.isdir(full):
+            try:
+                shutil.rmtree(full, ignore_errors=True)
+            except OSError:
+                pass
 
 
 def main():

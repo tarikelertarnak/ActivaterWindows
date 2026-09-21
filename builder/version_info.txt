@@ -1,7 +1,7 @@
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 0),
-    prodvers=(2, 0, 0, 0),
+    filevers=(3, 0, 0, 0),
+    prodvers=(3, 0, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -13,13 +13,13 @@ VSVersionInfo(
     StringFileInfo([
       StringTable('040904b0', [
         StringStruct('CompanyName', 'FreePro'),
-        StringStruct('FileDescription', 'Office Setup Wizard - Portable'),
-        StringStruct('FileVersion', '2.0.0.0'),
-        StringStruct('InternalName', 'OfficeSetupWizard'),
+        StringStruct('FileDescription', 'ActivatePro - Portable'),
+        StringStruct('FileVersion', '3.0.0.0'),
+        StringStruct('InternalName', 'ActivatePro'),
         StringStruct('LegalCopyright', 'Copyright (c) 2026 FreePro'),
-        StringStruct('OriginalFilename', 'OfficeSetupWizard.exe'),
-        StringStruct('ProductName', 'Office Setup Wizard'),
-        StringStruct('ProductVersion', '2.0.0.0')
+        StringStruct('OriginalFilename', 'ActivatePro.exe'),
+        StringStruct('ProductName', 'ActivatePro'),
+        StringStruct('ProductVersion', '3.0.0.0')
       ])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])

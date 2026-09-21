@@ -8,7 +8,11 @@ builder/build/
 builder/dist/
 
 # Built installer output
-/OfficeSetupWizard.exe
+/ActivatePro.exe
+/OfficeWizard.exe
+
+# MAS source extraction (scripts are embedded into resources/mas)
+/mas-src/
 
 # Debug log
 oi_debug.log
