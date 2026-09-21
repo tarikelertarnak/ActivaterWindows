@@ -21,6 +21,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 import xml.etree.ElementTree as ET
 
 APP_TITLE = "Office Setup Wizard"
+APP_VERSION = "2.0.0"
 
 CREATE_NO_WINDOW = 0x08000000
 STILL_ACTIVE = 259
@@ -28,9 +29,11 @@ SEE_MASK_NOCLOSEPROCESS = 0x00000040
 
 MAS_URL = (
     "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/"
-    "05c4f881efec946c0040cdd552d1afa9a519704b/MAS/All-In-One-Version-KL/MAS_AIO.cmd"
+    "f34d025d5102a790c75c839c8d46b672284729a5/MAS/All-In-One-Version-KL/MAS_AIO.cmd"
 )
 MAS_HASH = "850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA"
+
+ODT_VERSION = "20228-20124"
 
 CONFIG_URL = "https://config.office.com/deploymentsettings"
 
@@ -43,6 +46,40 @@ def dlog(msg):
             f.write("%s %s\n" % (time.strftime("%H:%M:%S"), msg))
     except Exception:
         pass
+
+
+def check_internet(timeout=5):
+    """Quick internet connectivity check."""
+    try:
+        req = urllib.request.Request(
+            "https://config.office.com/deploymentsettings",
+            method="HEAD",
+            headers={"User-Agent": "OfficeSetupWizard/%s" % APP_VERSION})
+        urllib.request.urlopen(req, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def download_odt_if_needed(log=lambda s: None):
+    """Download ODT files if setup.exe is missing from all known locations."""
+    setup = find_resource("setup.exe")
+    if setup:
+        return setup
+    log("setup.exe not found locally, attempting to download ODT...")
+    odt_url = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
+    try:
+        store = temp_store_dir()
+        os.makedirs(store, exist_ok=True)
+        data = download_with_retry(odt_url, max_retries=3, timeout=120, delay=10)
+        dst = os.path.join(store, "setup.exe")
+        with open(dst, "wb") as f:
+            f.write(data)
+        log("Downloaded setup.exe to: %s (%d bytes)" % (dst, len(data)))
+        return dst
+    except Exception as exc:
+        log("Failed to download ODT: %s" % exc)
+        return None
 
 
 PALETTES = {
@@ -149,6 +186,16 @@ I18N = {
         "st_cleanup": "Temizlik yapılıyor...",
         "st_final": "Kurulum tamamlandı, son kontroller yapılıyor...",
         "err_installed_hint": "irm https://get.activated.win | iex  komutunu yönetici PowerShell'de çalıştırıp menüden [2] Ohook seçeneğini seçin.",
+        "net_check": "İnternet bağlantısı kontrol ediliyor...",
+        "net_fail": "İnternet bağlantısı bulunamadı.\nLütfen internet bağlantınızı kontrol edip tekrar deneyin.",
+        "odt_dl": "Office Deployment Tool indiriliyor...",
+        "odt_dl_ok": "ODT başarıyla indirildi.",
+        "odt_dl_fail": "ODT indirilemedi. Lütfen setup.exe dosyasını manuel olarak yerleştirin.",
+        "about_title": "Hakkında",
+        "about_ver": "Sürüm: %s",
+        "about_info": "Office Setup Wizard — Microsoft Office LTSC 2024'ü tek tıkla kurun.",
+        "about_mas": "Aktivasyon: Microsoft Activation Scripts (MAS) v3.12",
+        "about_odt": "Dağıtım Aracı: Office Deployment Tool (ODT) %s",
     },
     "en": {
         "title": "Office Setup Wizard",
@@ -234,6 +281,16 @@ I18N = {
         "st_cleanup": "Cleaning up...",
         "st_final": "Setup finished, running final checks...",
         "err_installed_hint": "Run  irm https://get.activated.win | iex  in an admin PowerShell and choose option [2] Ohook from the menu.",
+        "net_check": "Checking internet connection...",
+        "net_fail": "No internet connection found.\nPlease check your connection and try again.",
+        "odt_dl": "Downloading Office Deployment Tool...",
+        "odt_dl_ok": "ODT downloaded successfully.",
+        "odt_dl_fail": "ODT download failed. Please place setup.exe manually.",
+        "about_title": "About",
+        "about_ver": "Version: %s",
+        "about_info": "Office Setup Wizard — Install Microsoft Office LTSC 2024 with one click.",
+        "about_mas": "Activation: Microsoft Activation Scripts (MAS) v3.12",
+        "about_odt": "Deployment Tool: Office Deployment Tool (ODT) %s",
     },
 }
 
@@ -1262,7 +1319,7 @@ class App:
     def __init__(self, root):
         dlog("App init")
         self.root = root
-        self.root.title(APP_TITLE)
+        self.root.title("%s v%s" % (APP_TITLE, APP_VERSION))
         self.root.resizable(False, False)
         try:
             self.root.iconbitmap(resource_path("office_setup_wizard.ico"))
@@ -1417,8 +1474,12 @@ class App:
 
         target_lang = "en" if self.lang == "tr" else "tr"
         self.lang_btn = ttk.Button(ctrl, text=target_lang.upper(), width=5,
-                                   command=self._toggle_lang)
-        self.lang_btn.pack(side="left")
+                                    command=self._toggle_lang)
+        self.lang_btn.pack(side="left", padx=(0, 8))
+
+        about_btn = ttk.Button(ctrl, text="?", width=3,
+                                command=self._show_about)
+        about_btn.pack(side="left")
 
     def _pop_theme_menu(self):
         try:
@@ -1737,6 +1798,14 @@ class App:
             if lang is None:
                 messagebox.showerror(APP_TITLE, self.t("lang_invalid"))
                 return
+
+        self.status_var.set(self.t("net_check"))
+        self.root.update_idletasks()
+        if not check_internet():
+            messagebox.showerror(APP_TITLE, self.t("net_fail"))
+            self.status_var.set("")
+            return
+
         if not self._ensure_setup_resources():
             return
 
@@ -1772,6 +1841,12 @@ class App:
 
     def _ensure_setup_resources(self):
         if find_resource("setup.exe", self.resource_dir):
+            return True
+        self.status_var.set(self.t("odt_dl"))
+        self.root.update_idletasks()
+        dl = download_odt_if_needed(self._append_log)
+        if dl:
+            self.status_var.set(self.t("odt_dl_ok"))
             return True
         return self._ask_resource_folder()
 
@@ -2004,6 +2079,47 @@ class App:
                 ctypes.windll.kernel32.Beep(880, 250)
             except Exception:
                 pass
+
+    def _show_about(self):
+        win = tk.Toplevel(self.root)
+        win.title(self.t("about_title"))
+        win.configure(bg=self.pal["bg"])
+        win.resizable(False, False)
+        win.transient(self.root)
+        win.grab_set()
+
+        tk.Label(win, text=APP_TITLE,
+                 font=("Segoe UI", 14, "bold"),
+                 bg=self.pal["bg"], fg=self.pal["banner"]).pack(padx=20, pady=(16, 4))
+        tk.Label(win, text=self.t("about_ver") % APP_VERSION,
+                 font=("Segoe UI", 10),
+                 bg=self.pal["bg"], fg=self.pal["fg"]).pack(padx=20)
+        tk.Label(win, text=self.t("about_info"),
+                 font=("Segoe UI", 9), wraplength=360, justify="center",
+                 bg=self.pal["bg"], fg=self.pal["sub"]).pack(padx=20, pady=(8, 4))
+        tk.Label(win, text=self.t("about_mas"),
+                 font=("Segoe UI", 9), wraplength=360, justify="center",
+                 bg=self.pal["bg"], fg=self.pal["sub"]).pack(padx=20, pady=(2, 2))
+        tk.Label(win, text=self.t("about_odt") % ODT_VERSION,
+                 font=("Segoe UI", 9), wraplength=360, justify="center",
+                 bg=self.pal["bg"], fg=self.pal["sub"]).pack(padx=20, pady=(2, 4))
+
+        link = tk.Label(win, text="github.com/TARIKELER-TARNAK/OfficeSetupWizard",
+                        font=("Segoe UI", 8, "underline"), cursor="hand2",
+                        fg=self.pal["link"], bg=self.pal["bg"])
+        link.pack(padx=20, pady=(4, 8))
+        link.bind("<Button-1>", lambda e: open_url(
+            "https://github.com/TARIKELER-TARNAK/OfficeSetupWizard"))
+
+        ttk.Button(win, text="OK", command=win.destroy).pack(pady=(0, 12))
+
+        win.update_idletasks()
+        w = max(420, win.winfo_reqwidth())
+        h = win.winfo_reqheight()
+        x = self.root.winfo_rootx() + (self.root.winfo_width() - w) // 2
+        y = max(10, self.root.winfo_rooty() + 40)
+        win.geometry("%dx%d+%d+%d" % (w, h, x, y))
+        apply_dark_titlebar(win.winfo_id(), self.theme == "dark")
 
     def _on_close(self):
         if self.running:

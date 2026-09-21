@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.pyo
 
 # PyInstaller build artifacts
 builder/build/
@@ -11,3 +12,14 @@ builder/dist/
 
 # Debug log
 oi_debug.log
+
+# Temp files
+*.tmp
+*.bak
+*.orig
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
