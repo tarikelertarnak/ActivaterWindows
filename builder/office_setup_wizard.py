@@ -20,8 +20,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 import xml.etree.ElementTree as ET
 
-APP_TITLE = "ActivatePro"
-APP_VERSION = "3.0.0"
+APP_TITLE = "ActivaterWindows"
+APP_VERSION = "1.0.0"
 
 CREATE_NO_WINDOW = 0x08000000
 STILL_ACTIVE = 259
@@ -50,7 +50,7 @@ def check_internet(timeout=5):
         req = urllib.request.Request(
             "https://config.office.com/deploymentsettings",
             method="HEAD",
-            headers={"User-Agent": "ActivatePro/%s" % APP_VERSION})
+            headers={"User-Agent": "ActivaterWindows/%s" % APP_VERSION})
         urllib.request.urlopen(req, timeout=timeout)
         return True
     except Exception:
@@ -99,23 +99,36 @@ PALETTES = {
 
 I18N = {
     "tr": {
-        "title": "ActivatePro",
-        "banner": "ActivatePro",
+        "title": "ActivaterWindows",
+        "banner": "ActivaterWindows",
         "tab_install": "Office Kurulumu",
         "tab_activate": "Aktivasyon",
-        "act_frame": "Windows / Office / ESU Aktivasyonu",
+        "act_frame": "Windows / Office Aktivasyonu",
         "act_pick": "Aktivasyon Türü:",
-        "act_hwid": "Windows 10/11 — Kalıcı (HWID, dijital lisans)",
+        "act_win11pro": "Windows 11 Pro — Kalıcı (HWID)",
+        "act_win11work": "Windows 11 Pro for Workstations — Kalıcı (HWID)",
+        "act_win11home": "Windows 11 Home — Kalıcı (HWID)",
+        "act_win11": "Windows 11 — Kalıcı (HWID)",
+        "act_win10pro": "Windows 10 Pro — Kalıcı (HWID)",
+        "act_win10home": "Windows 10 Home — Kalıcı (HWID)",
+        "act_win10": "Windows 10 — Kalıcı (HWID)",
+        "act_ohook": "Office LTSC/365 — Kalıcı (Ohook)",
         "act_tsforge": "Windows 7-11 + Server — Kalıcı (TSforge)",
         "act_esu": "Windows 10 ESU — TSforge (kalıcı)",
-        "act_ohook": "Office LTSC/365 — Kalıcı (Ohook)",
         "act_kms_all": "Windows + Office — 180 Gün (Online KMS)",
         "act_kms_windows": "Windows — 180 Gün (Online KMS)",
         "act_kms_office": "Office — 180 Gün (Online KMS)",
         "act_all": "Hepsi — Windows + ESU + Office (TSforge)",
         "act_ohook_rm": "Ohook Kaldır (Office)",
         "act_kms_rm": "Online KMS Kaldır (tümü)",
-        "act_desc_hwid": "Windows 10/11 için dijital lisans (kalıcı, Microsoft hesabına bağlanır). İnternet gerekir.",
+        "act_desc_hwid": "Windows için dijital lisans (kalıcı, Microsoft hesabına bağlanır). İnternet gerekir.",
+        "act_desc_win11pro": "Windows 11 Pro için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win11work": "Windows 11 Pro for Workstations için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win11home": "Windows 11 Home için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win11": "Windows 11 için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win10pro": "Windows 10 Pro için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win10home": "Windows 10 Home için dijital lisans (kalıcı, HWID). İnternet gerekir.",
+        "act_desc_win10": "Windows 10 için dijital lisans (kalıcı, HWID). İnternet gerekir.",
         "act_desc_tsforge": "Windows 7/8/10/11 ve Server sürümleri için kalıcı aktivasyon. İnternet gerekmez.",
         "act_desc_esu": "Windows 10 için Extended Security Updates (ESU) aktivasyonu, kalıcı.",
         "act_desc_ohook": "Office LTSC 2024 / 2021 / MS365 için kalıcı aktivasyon (lisans dosyası hook'u). İnternet gerekmez.",
@@ -125,7 +138,7 @@ I18N = {
         "act_desc_all": "Windows, ESU ve Office'i tek seferde TSforge ile kalıcı aktive eder.",
         "act_desc_ohook_rm": "Ohook ile aktive edilmiş Office lisansını geri alır (orijinal lisans durumuna döner).",
         "act_desc_kms_rm": "Kurulmuş Online KMS yenileme görevini ve lisansları kaldırır.",
-        "act_run": "Aktive Et",
+        "act_run": "Aktifleştir",
         "act_check": "Aktivasyon Durumunu Kontrol Et",
         "act_running": "Aktivasyon çalıştırılıyor...",
         "act_done": "Aktivasyon işlemi tamamlandı. Durum kontrolü ile doğrulayın.",
@@ -190,7 +203,7 @@ I18N = {
         "uac_retry": "Yönetici onayı verilmedi. Kurulum için yönetici izni gerekiyor.\nTekrar denensin mi?",
         "res_missing_title": "Eksik Kurulum Dosyası",
         "res_missing_msg": "Gerekli kurulum dosyası (setup.exe) bulunamadı.\n\nsetup.exe, Office Deployment Tool'un parçasıdır ve Office kurulumunu başlatır. Dosya silinmiş ya da dağıtılan sürümde eksik olabilir.\n\nAşağıdan bu dosyaların bulunduğu klasörü seçerek devam edebilirsiniz.",
-        "res_missing_where": "Dosyaları şu konumlara da koyabilirsiniz:\n- {TEMP}\n- ActivatePro.exe'nin yanına\n\nsetup.exe, aka.ms/odt adresinden indirilen 'officedeploymenttool_20131-20090.exe' zip dosyasının içinden çıkarılır.",
+        "res_missing_where": "Dosyaları şu konumlara da koyabilirsiniz:\n- {TEMP}\n- ActivaterWindows.exe'nin yanına\n\nsetup.exe, aka.ms/odt adresinden indirilen 'officedeploymenttool_20131-20090.exe' zip dosyasının içinden çıkarılır.",
         "res_use": "Klasörü Seç ve Devam Et",
         "res_invalid": "Seçilen klasörde setup.exe bulunamadı.\nOffice Deployment Tool dosyalarının bulunduğu klasörü seçin.",
         "helper_failed": "Arka plan işlemi beklenmedik şekilde sonlandı.",
@@ -220,21 +233,27 @@ I18N = {
         "odt_dl_fail": "ODT indirilemedi. Lütfen setup.exe dosyasını manuel olarak yerleştirin.",
         "about_title": "Hakkında",
         "about_ver": "Sürüm: %s",
-        "about_info": "ActivatePro — Microsoft Office LTSC 2024'ü tek tıkla kurun; Windows, Office ve ESU'yu aktive edin.",
+        "about_info": "ActivaterWindows — Microsoft Office LTSC 2024'ü tek tıkla kurun; Windows ve Office'i aktive edin.",
         "about_mas": "Aktivasyon: Microsoft Activation Scripts (MAS) v3.12",
         "about_odt": "Dağıtım Aracı: Office Deployment Tool (ODT) %s",
     },
     "en": {
-        "title": "ActivatePro",
-        "banner": "ActivatePro",
+        "title": "ActivaterWindows",
+        "banner": "ActivaterWindows",
         "tab_install": "Office Setup",
         "tab_activate": "Activation",
-        "act_frame": "Windows / Office / ESU Activation",
+        "act_frame": "Windows / Office Activation",
         "act_pick": "Activation Type:",
-        "act_hwid": "Windows 10/11 — Permanent (HWID, digital license)",
+        "act_win11pro": "Windows 11 Pro — Permanent (HWID)",
+        "act_win11work": "Windows 11 Pro for Workstations — Permanent (HWID)",
+        "act_win11home": "Windows 11 Home — Permanent (HWID)",
+        "act_win11": "Windows 11 — Permanent (HWID)",
+        "act_win10pro": "Windows 10 Pro — Permanent (HWID)",
+        "act_win10home": "Windows 10 Home — Permanent (HWID)",
+        "act_win10": "Windows 10 — Permanent (HWID)",
+        "act_ohook": "Office LTSC/365 — Permanent (Ohook)",
         "act_tsforge": "Windows 7-11 + Server — Permanent (TSforge)",
         "act_esu": "Windows 10 ESU — TSforge (permanent)",
-        "act_ohook": "Office LTSC/365 — Permanent (Ohook)",
         "act_kms_all": "Windows + Office — 180 Days (Online KMS)",
         "act_kms_windows": "Windows — 180 Days (Online KMS)",
         "act_kms_office": "Office — 180 Days (Online KMS)",
@@ -242,6 +261,13 @@ I18N = {
         "act_ohook_rm": "Uninstall Ohook (Office)",
         "act_kms_rm": "Uninstall Online KMS (all)",
         "act_desc_hwid": "Digital license for Windows 10/11 (permanent, linked to Microsoft account). Internet required.",
+        "act_desc_win11pro": "Digital license for Windows 11 Pro (permanent, HWID). Internet required.",
+        "act_desc_win11work": "Digital license for Windows 11 Pro for Workstations (permanent, HWID). Internet required.",
+        "act_desc_win11home": "Digital license for Windows 11 Home (permanent, HWID). Internet required.",
+        "act_desc_win11": "Digital license for Windows 11 (permanent, HWID). Internet required.",
+        "act_desc_win10pro": "Digital license for Windows 10 Pro (permanent, HWID). Internet required.",
+        "act_desc_win10home": "Digital license for Windows 10 Home (permanent, HWID). Internet required.",
+        "act_desc_win10": "Digital license for Windows 10 (permanent, HWID). Internet required.",
         "act_desc_tsforge": "Permanent activation for Windows 7/8/10/11 and Server editions. No internet required.",
         "act_desc_esu": "Extended Security Updates (ESU) activation for Windows 10, permanent.",
         "act_desc_ohook": "Permanent activation for Office LTSC 2024 / 2021 / MS365 (license file hook). No internet required.",
@@ -316,7 +342,7 @@ I18N = {
         "uac_retry": "Administrator approval was not granted. Setup requires administrator rights.\nTry again?",
         "res_missing_title": "Missing Setup File",
         "res_missing_msg": "The required setup file (setup.exe) could not be found.\n\nsetup.exe is part of the Office Deployment Tool and starts the Office installation. It may have been deleted or be missing from the distributed build.\n\nYou can continue by selecting a folder that contains these files below.",
-        "res_missing_where": "You can also place the files here:\n- {TEMP}\n- Next to ActivatePro.exe\n\nsetup.exe is extracted from the 'officedeploymenttool_20131-20090.exe' zip downloaded from aka.ms/odt.",
+        "res_missing_where": "You can also place the files here:\n- {TEMP}\n- Next to ActivaterWindows.exe\n\nsetup.exe is extracted from the 'officedeploymenttool_20131-20090.exe' zip downloaded from aka.ms/odt.",
         "res_use": "Select Folder & Continue",
         "res_invalid": "setup.exe was not found in the selected folder.\nPlease select a folder that contains the Office Deployment Tool files.",
         "helper_failed": "The background process ended unexpectedly.",
@@ -346,7 +372,7 @@ I18N = {
         "odt_dl_fail": "ODT download failed. Please place setup.exe manually.",
         "about_title": "About",
         "about_ver": "Version: %s",
-        "about_info": "ActivatePro — One-click Microsoft Office LTSC 2024 setup; activate Windows, Office and ESU.",
+        "about_info": "ActivaterWindows — One-click Microsoft Office LTSC 2024 setup; activate Windows and Office.",
         "about_mas": "Activation: Microsoft Activation Scripts (MAS) v3.12",
         "about_odt": "Deployment Tool: Office Deployment Tool (ODT) %s",
     },
@@ -416,10 +442,16 @@ DEFAULT_APPS = {"Excel", "PowerPoint", "Word"}
 
 # Activation methods: (i18n key, MAS flag)
 ACT_METHODS = [
-    ("act_hwid", "/HWID"),
+    ("act_win11pro", "/HWID"),
+    ("act_win11work", "/HWID"),
+    ("act_win11home", "/HWID"),
+    ("act_win11", "/HWID"),
+    ("act_win10pro", "/HWID"),
+    ("act_win10home", "/HWID"),
+    ("act_win10", "/HWID"),
+    ("act_ohook", "/Ohook"),
     ("act_tsforge", "/Z-Windows"),
     ("act_esu", "/Z-ESU"),
-    ("act_ohook", "/Ohook"),
     ("act_kms_all", "/K-WindowsOffice"),
     ("act_kms_windows", "/K-Windows"),
     ("act_kms_office", "/K-Office"),
@@ -558,7 +590,7 @@ def run_check_activation(log, timeout=600):
 
 
 def temp_store_dir():
-    return os.path.join(tempfile.gettempdir(), "ActivatePro")
+    return os.path.join(tempfile.gettempdir(), "ActivaterWindows")
 
 
 def res_candidates(name):
@@ -752,7 +784,7 @@ def acquire_single_instance():
     global _mutex_handle
     try:
         _mutex_handle = ctypes.windll.kernel32.CreateMutexW(
-            None, False, "Local\\ActivatePro_SingleInstance")
+            None, False, "Local\\ActivaterWindows_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
             ctypes.windll.kernel32.CloseHandle(_mutex_handle)
             _mutex_handle = None
@@ -781,7 +813,7 @@ def focus_existing():
             if hproc:
                 buf = ctypes.create_unicode_buffer(260)
                 if psapi.GetModuleBaseNameW(hproc, None, buf, 260) and \
-                        buf.value.lower().startswith("activatepro"):
+                        buf.value.lower().startswith("activaterwindows"):
                     found.append(hwnd)
                 kernel32.CloseHandle(hproc)
             return True
@@ -1788,6 +1820,17 @@ class App:
                         troughcolor=p["trough"], background=p["accent"],
                         bordercolor=p["bg"], lightcolor=p["accent"],
                         darkcolor=p["accent"])
+        style.configure("TNotebook", background=p["bg"],
+                         borderwidth=1, bordercolor=p["border"], tabmargins=(2, 4, 2, 0))
+        style.configure("TNotebook.Tab", background=p["btn"],
+                        foreground=p["fg"], padding=(14, 6),
+                        bordercolor=p["border"], lightcolor=p["btn"],
+                        darkcolor=p["btn"], focuscolor=p["accent"])
+        style.map("TNotebook.Tab",
+                  background=[("selected", p["accent"]),
+                              ("active", p["btn_hover"])],
+                  foreground=[("selected", p["btn_fg"]),
+                              ("active", p["fg"])])
         style.configure("TSeparator", background=p["border"])
         style.configure("TScrollbar", background=p["btn"],
                         troughcolor=p["trough"], bordercolor=p["bg"],
@@ -2362,10 +2405,10 @@ class App:
 
 
 def cleanup_temp_files():
-    """Remove all temp files created by ActivatePro — zero residue."""
+    """Remove all temp files created by ActivaterWindows — zero residue."""
     temp = tempfile.gettempdir()
     patterns = [
-        os.path.join(temp, "ActivatePro"),
+        os.path.join(temp, "ActivaterWindows"),
         os.path.join(temp, "OfficeInstaller_*"),
         os.path.join(temp, "oi_debug.log"),
         os.path.join(temp, "office_config.xml"),
@@ -2389,10 +2432,10 @@ def cleanup_temp_files():
                     os.remove(pat)
             except OSError:
                 pass
-    # Also clean ActivatePro_* installer temp dirs
+    # Also clean ActivaterWindows_* installer temp dirs
     for d in os.listdir(temp):
         full = os.path.join(temp, d)
-        if d.startswith("ActivatePro_") and os.path.isdir(full):
+        if d.startswith("ActivaterWindows_") and os.path.isdir(full):
             try:
                 shutil.rmtree(full, ignore_errors=True)
             except OSError:

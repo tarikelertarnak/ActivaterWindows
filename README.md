@@ -1,12 +1,12 @@
-# ActivatePro
+# ActivaterWindows
 
 > **Microsoft Office LTSC Professional Plus 2024'ü tek tıkla kurun; Windows, Office ve ESU aktivasyonlarını tek arayüzden yönetin.**
 
-`ActivatePro`, Office Deployment Tool'u (ODT) sararak kurulumu otomatikleştiren ve **Microsoft Activation Scripts (MAS v3.12)** ile aktivasyonu tek tıkla yapan kullanıcı dostu bir **portable Windows masaüstü uygulamasıdır**. Tek `.exe` dosyası — kurulum gerekmez, silindiğinde sıfır kalıntı.
+`ActivaterWindows`, Office Deployment Tool'u (ODT) sararak kurulumu otomatikleştiren ve **Microsoft Activation Scripts (MAS v3.12)** ile aktivasyonu tek tıkla yapan kullanıcı dostu bir **portable Windows masaüstü uygulamasıdır**. Tek `.exe` dosyası — kurulum gerekmez, silindiğinde sıfır kalıntı.
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-3.0.0-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/python-3.8+-3776AB?style=flat-square&logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/UI-Tkinter-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
@@ -27,7 +27,7 @@
 | **38+ Dil Desteği** | tr-tr, en-us, de-de, fr-fr ve daha fazlasi |
 | **Aydınlık/Karanlık Tema** | Modern, sistem temasi otomatik algilama |
 | **Gomulu Aktivasyon (MAS)** | Windows / Office / ESU aktivasyonu script internetten inmez, exe icinde gomuludur |
-| **Aktivasyon Tipi Secimi** | HWID, TSforge, ESU, Ohook, Online KMS, Kaldirma - 10 yontem |
+| **Aktivasyon Tipi Secimi** | Windows 11 Pro / for Workstations / 11 / 10 Pro / 10 + Office — 16 yontem |
 | **Aktivasyon Durum Kontrolu** | Tek tıkla mevcut aktivasyon durumunu gosterir |
 | **Otomatik ODT Indirme** | Eger setup.exe yoksa ODT'yi otomatik indirir |
 | **Internet Kontrolu** | Kurulumdan once internet baglantisini dogrular |
@@ -38,16 +38,16 @@
 
 ### Portable Kullanim (Onerilen)
 
-1. `ActivatePro.exe` dosyasini indirin
+1. `ActivaterWindows.exe` dosyasini indirin
 2. Calistirin - hepsi bu kadar! **Kurulum gerekmez.**
 3. Gerekli dosyalar otomatik olarak indirilir ve kurulur
-4. Silmek icin `ActivatePro.exe`'yi silmeniz yeterli — **sifir kalıntı**
+4. Silmek icin `ActivaterWindows.exe`'yi silmeniz yeterli — **sifir kalıntı**
 
 ### Kaynaktan Calistirma
 
 ```powershell
-git clone https://github.com/tarikelertarnak/ActivatePro.git
-cd ActivatePro
+git clone https://github.com/tarikelertarnak/ActivaterWindows.git
+cd ActivaterWindows
 python builder/office_setup_wizard.py
 ```
 
@@ -71,24 +71,26 @@ Derlenen yurutebilir dosya `dist/` klasorunde olusur.
 
 ### Sekme 2: Aktivasyon
 1. **Aktivasyon Turu** sec (combobox):
-   - `Windows 10/11 — Kalıcı (HWID)`
-   - `Windows 7-11 + Server — Kalıcı (TSforge)`
-   - `Windows 10 ESU — TSforge (kalıcı)`
+   - `Windows 11 Pro — Kalıcı (HWID)`
+   - `Windows 11 Pro for Workstations — Kalıcı (HWID)`
+   - `Windows 11 — Kalıcı (HWID)`
+   - `Windows 10 Pro — Kalıcı (HWID)`
+   - `Windows 10 Home / Windows 10 — Kalıcı (HWID)`
    - `Office LTSC/365 — Kalıcı (Ohook)`
-   - `Windows + Office — 180 Gun (Online KMS)`
-   - ve kaldirma secenekleri
-2. **Aktive Et** butonuna bas
+   - `Windows 7-11 + Server — Kalıcı (TSforge)`
+   - ve diger secenekler (ESU, Online KMS, kaldirma)
+2. **Aktifleştir** butonuna bas
 3. Istersen **Aktivasyon Durumunu Kontrol Et** ile dogrula
 
 ### Temizlik
 
 Uygulama kapatildiginda olusturulan tum gecici dosyalar otomatik olarak temizlenir:
-- `%TEMP%\ActivatePro\` klasoru
+- `%TEMP%\ActivaterWindows\` klasoru
 - `%TEMP%\oi_debug.log` debug logu
 - `%TEMP%\office_config.xml` konfigurasyon
 - `%TEMP%\MAS_*.cmd` / `%TEMP%\CheckAct_*.cmd` aktivasyon scriptleri (kullanim sonrasi silinir)
 
-`ActivatePro.exe`'yi sildiginizde bilgisayarda hicbir kalıntı kalmaz.
+`ActivaterWindows.exe`'yi sildiginizde bilgisayarda hicbir kalıntı kalmaz.
 
 ---
 
@@ -123,8 +125,8 @@ Word, Excel, PowerPoint, Outlook, OneNote, Access, Publisher, Skype for Business
 ## Proje Yapisi
 
 ```
-ActivatePro/
-├── ActivatePro.exe                # Derlenmis portable uygulama
+ActivaterWindows/
+├── ActivaterWindows.exe                # Derlenmis portable uygulama
 ├── builder/
 │   ├── build.ps1                   # .exe derleme betigi
 │   ├── office_setup_wizard.py      # Ana uygulama
@@ -155,7 +157,7 @@ Bu arac resmi Microsoft araclari (ODT) uzerine kuruludur. Aktivasyon ozelligi, t
 
 ## Katkida Bulun
 
-Hata bildirimleri ve gelistirme onerileri icin [Issues](https://github.com/tarikelertarnak/ActivatePro/issues) sayfasini kullanabilirsin.
+Hata bildirimleri ve gelistirme onerileri icin [Issues](https://github.com/tarikelertarnak/ActivaterWindows/issues) sayfasini kullanabilirsin.
 
 **Yapan:** [Tariq Eler](https://github.com/tarikelertarnak)
 

@@ -34,7 +34,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ActivatePro',
+    name='ActivaterWindows',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

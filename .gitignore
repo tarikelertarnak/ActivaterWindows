@@ -8,7 +8,8 @@ builder/build/
 builder/dist/
 
 # Built installer output
-/ActivatePro.exe
+/ActivaterWindows.exe
+/OfficeSetupWizard.exe
 /OfficeWizard.exe
 
 # MAS source extraction (scripts are embedded into resources/mas)
