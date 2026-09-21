@@ -1,8 +1,8 @@
 # ActivaterWindows
 
-> **Microsoft Office LTSC Professional Plus 2024'ü tek tıkla kurun; Windows, Office ve ESU aktivasyonlarını tek arayüzden yönetin.**
+> **One-click Microsoft Office LTSC Professional Plus 2024 installer, with Windows, Office and ESU activation managed from a single interface.**
 
-`ActivaterWindows`, Office Deployment Tool'u (ODT) sararak kurulumu otomatikleştiren ve **Microsoft Activation Scripts (MAS v3.12)** ile aktivasyonu tek tıkla yapan kullanıcı dostu bir **portable Windows masaüstü uygulamasıdır**. Tek `.exe` dosyası — kurulum gerekmez, silindiğinde sıfır kalıntı.
+`ActivaterWindows` is a user-friendly **portable Windows desktop application** that wraps the Office Deployment Tool (ODT) to automate installation and uses **Microsoft Activation Scripts (MAS v3.12)** for one-click activation. A single `.exe` — no installation required, zero leftovers when deleted.
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
@@ -16,34 +16,34 @@
 
 ---
 
-## Ozellikler
+## Features
 
-| Ozellik | Aciklama |
+| Feature | Description |
 |---|---|
-| **Portable** | Tek `.exe`, kurulum gerekmez, her bilgisayarda calisir |
-| **Sifir Kalıntı** | Silindiginde temp dosyalari, loglar, registry temizlenir |
-| **Tek Tıkla Kurulum** | Office LTSC Professional Plus 2024 - istedigin dilde tek tıkla |
-| **Ozel Konfigurasyon** | Kendi `Configuration.xml` dosyani kullan |
-| **38+ Dil Desteği** | tr-tr, en-us, de-de, fr-fr ve daha fazlasi |
-| **Aydınlık/Karanlık Tema** | Modern, sistem temasi otomatik algilama |
-| **Gomulu Aktivasyon (MAS)** | Windows / Office / ESU aktivasyonu script internetten inmez, exe icinde gomuludur |
-| **Aktivasyon Tipi Secimi** | Windows 11 Pro / for Workstations / 11 / 10 Pro / 10 + Office — 16 yontem |
-| **Aktivasyon Durum Kontrolu** | Tek tıkla mevcut aktivasyon durumunu gosterir |
-| **Otomatik ODT Indirme** | Eger setup.exe yoksa ODT'yi otomatik indirir |
-| **Internet Kontrolu** | Kurulumdan once internet baglantisini dogrular |
+| **Portable** | Single `.exe`, no installation, runs on any machine |
+| **Zero Leftover** | Temp files, logs, registry cleaned on exit |
+| **One-Click Installation** | Office LTSC Professional Plus 2024 in your language |
+| **Custom Configuration** | Use your own `Configuration.xml` file |
+| **38+ Languages** | tr-tr, en-us, de-de, fr-fr and more |
+| **Light/Dark Theme** | Automatic system theme detection |
+| **Embedded Activation (MAS)** | Windows / Office / ESU activation scripts are embedded in the exe — nothing is downloaded at runtime |
+| **Activation Type Selection** | Windows 11 Pro / for Workstations / 11 / 10 Pro / 10 + Office — 16 methods |
+| **Activation Status Check** | One-click current activation status |
+| **Automatic ODT Download** | Downloads ODT automatically if setup.exe is missing |
+| **Internet Check** | Verifies connectivity before installation |
 
 ---
 
-## Kullanim
+## Usage
 
-### Portable Kullanim (Onerilen)
+### Portable Usage (Recommended)
 
-1. `ActivaterWindows.exe` dosyasini indirin
-2. Calistirin - hepsi bu kadar! **Kurulum gerekmez.**
-3. Gerekli dosyalar otomatik olarak indirilir ve kurulur
-4. Silmek icin `ActivaterWindows.exe`'yi silmeniz yeterli — **sifir kalıntı**
+1. Download `ActivaterWindows.exe`
+2. Run it — that's it! **No installation required.**
+3. Required files are downloaded and installed automatically
+4. To remove, just delete `ActivaterWindows.exe` — **zero leftovers**
 
-### Kaynaktan Calistirma
+### Run from Source
 
 ```powershell
 git clone https://github.com/tarikelertarnak/ActivaterWindows.git
@@ -51,118 +51,119 @@ cd ActivaterWindows
 python builder/office_setup_wizard.py
 ```
 
-### Derleme (Standalone .exe)
+### Build (Standalone .exe)
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File builder/build.ps1
 ```
 
-Derlenen yurutebilir dosya `dist/` klasorunde olusur.
+The built executable is placed in the `dist/` folder.
 
 ---
 
-## Kullanim Adimlari
+## How to Use
 
-### Sekme 1: Office Kurulumu
-1. **Kurulum Modu** sec: *Otomatik* (LTSC 2024) veya *Ozel Configuration*
-2. Kurulum dilini sec (orn. `tr-tr`, `en-us`)
-3. **Kurulumu Baslat** butonuna bas
-4. Office indirilir, kurulur ve (istersen) Ohook ile etkinlestirilir
+### Tab 1: Office Installation
+1. Choose **Installation Mode**: *Automatic* (LTSC 2024) or *Custom Configuration*
+2. Select the installation language (e.g. `tr-tr`, `en-us`)
+3. Press **Start Installation**
+4. Office is downloaded, installed and (optionally) activated with Ohook
 
-### Sekme 2: Aktivasyon
-1. **Aktivasyon Turu** sec (combobox):
-   - `Windows 11 Pro — Kalıcı (HWID)`
-   - `Windows 11 Pro for Workstations — Kalıcı (HWID)`
-   - `Windows 11 — Kalıcı (HWID)`
-   - `Windows 10 Pro — Kalıcı (HWID)`
-   - `Windows 10 Home / Windows 10 — Kalıcı (HWID)`
-   - `Office LTSC/365 — Kalıcı (Ohook)`
-   - `Windows 7-11 + Server — Kalıcı (TSforge)`
-   - ve diger secenekler (ESU, Online KMS, kaldirma)
-2. **Aktifleştir** butonuna bas
-3. Istersen **Aktivasyon Durumunu Kontrol Et** ile dogrula
+### Tab 2: Activation
+1. Choose an **Activation Type** (combobox, default: *All — Windows + ESU + Office*):
+   - `Windows 11 Pro — Permanent (HWID)`
+   - `Windows 11 Pro for Workstations — Permanent (HWID)`
+   - `Windows 11 Home / Windows 11 — Permanent (HWID)`
+   - `Windows 10 Pro / Home / Windows 10 — Permanent (HWID)`
+   - `Office LTSC/365 — Permanent (Ohook)`
+   - `Windows 7-11 + Server — Permanent (TSforge)`
+   - and more (ESU, Online KMS, uninstall)
+2. Press **Activate**
+3. Optionally verify with **Check Activation Status**
 
-### Temizlik
+> **Edit Configuration Settings** is always available below the tabs — it is kept out of the installation flow on purpose.
 
-Uygulama kapatildiginda olusturulan tum gecici dosyalar otomatik olarak temizlenir:
-- `%TEMP%\ActivaterWindows\` klasoru
-- `%TEMP%\oi_debug.log` debug logu
-- `%TEMP%\office_config.xml` konfigurasyon
-- `%TEMP%\MAS_*.cmd` / `%TEMP%\CheckAct_*.cmd` aktivasyon scriptleri (kullanim sonrasi silinir)
+### Cleanup
 
-`ActivaterWindows.exe`'yi sildiginizde bilgisayarda hicbir kalıntı kalmaz.
+All temporary files are automatically removed when the application closes:
+- `%TEMP%\ActivaterWindows\` folder
+- `%TEMP%\oi_debug.log` debug log
+- `%TEMP%\office_config.xml` configuration
+- `%TEMP%\MAS_*.cmd` / `%TEMP%\CheckAct_*.cmd` activation scripts (deleted after use)
+
+Deleting `ActivaterWindows.exe` leaves nothing behind.
 
 ---
 
-## Teknik Detaylar
+## Technical Details
 
-| Bilesen | Surum | Kaynak |
+| Component | Version | Source |
 |---|---|---|
 | Office Deployment Tool | 16.0.20228.20124 | [aka.ms/odt](https://aka.ms/odt) |
 | Microsoft Activation Scripts | v3.12 | [massgrave.dev](https://massgrave.dev) |
-| Office LTSC Pro Plus 2024 | Volume License | PerpetualVL2024 kanali |
+| Office LTSC Pro Plus 2024 | Volume License | PerpetualVL2024 channel |
 
-### Desteklenen Uygulamalar
+### Supported Applications
 
 Word, Excel, PowerPoint, Outlook, OneNote, Access, Publisher, Skype for Business, OneDrive, Visio, Project
 
-### Desteklenen Diller
+### Supported Languages
 
-38+ dil: Turkce, English, Deutsch, Francais, Espanol, Italiano, Portugues, Nederlands, Polski, Rus, Ukraynaca, Arapca, Hintce, Bahasa, Tayca, Vietnamca, Cince, Japonca, Korece ve daha fazlasi.
+38+ languages: Turkish, English, Deutsch, Français, Español, Italiano, Português, Nederlands, Polski, Русский, Українська, العربية, हिन्दी, Bahasa, ไทย, Tiếng Việt, 中文, 日本語, 한국어 and more.
 
-### Aktivasyon Yontemleri (MAS v3.12)
+### Activation Methods (MAS v3.12)
 
-| Yontem | Kapsam | Sure |
+| Method | Scope | Duration |
 |---|---|---|
-| HWID | Windows 10/11 | Kalici (dijital lisans) |
-| TSforge | Windows 7-11 + Server | Kalici |
-| ESU | Windows 10 (ESU) | Kalici |
-| Ohook | Office LTSC/365 | Kalici |
-| Online KMS | Windows / Office | 180 gun (oto-yenileme gorevi) |
+| HWID | Windows 10/11 | Permanent (digital license) |
+| TSforge | Windows 7-11 + Server | Permanent |
+| ESU | Windows 10 (ESU) | Permanent |
+| Ohook | Office LTSC/365 | Permanent |
+| Online KMS | Windows / Office | 180 days (auto-renew task) |
 
 ---
 
-## Proje Yapisi
+## Project Structure
 
 ```
 ActivaterWindows/
-├── ActivaterWindows.exe                # Derlenmis portable uygulama
+├── ActivaterWindows.exe                # Compiled portable application
 ├── builder/
-│   ├── build.ps1                   # .exe derleme betigi
-│   ├── office_setup_wizard.py      # Ana uygulama
-│   ├── office_setup_wizard.spec    # PyInstaller spec (MAS scripti gomulur)
-│   ├── office_setup_wizard.ico     # Uygulama simgesi
-│   ├── version_info.txt            # Windows surum bilgisi
-│   └── icons/                      # Tema simgeleri
-│       ├── light/                  # Aydinlik tema ikonlari
-│       └── dark/                   # Karanlik tema ikonlari
+│   ├── build.ps1                   # .exe build script
+│   ├── office_setup_wizard.py      # Main application
+│   ├── office_setup_wizard.spec    # PyInstaller spec (embeds MAS script)
+│   ├── office_setup_wizard.ico     # Application icon
+│   ├── version_info.txt            # Windows version info
+│   └── icons/                      # Theme icons
+│       ├── light/                  # Light theme icons
+│       └── dark/                   # Dark theme icons
 ├── resources/
 │   ├── setup.exe                   # Office Deployment Tool
-│   ├── Configuration.xml           # Varsayilan konfigurasyon
+│   ├── Configuration.xml           # Default configuration
 │   ├── configuration-Office365-x64.xml
 │   └── mas/
-│       ├── MAS_AIO.cmd             # Gomulu aktivasyon scripti (v3.12)
+│       ├── MAS_AIO.cmd             # Embedded activation script (v3.12)
 │       └── Check_Activation_Status.cmd
-├── LICENSE                         # MIT Lisans
+├── LICENSE                         # MIT License
 └── README.md
 ```
 
 ---
 
-## Sorumluluk Reddi
+## Disclaimer
 
-Bu arac resmi Microsoft araclari (ODT) uzerine kuruludur. Aktivasyon ozelligi, topluluk tarafindan gelistirilen **Microsoft Activation Scripts (MAS)** projesini kullanir (GPL-3.0, [massgrave/Microsoft-Activation-Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts)). Lissansiz yazilim kullanimi ulkenizin yasalarina ve Microsoft kullanim kosullarina tabidir. Bu proje yalnizca egitim ve kisisel kullanim amaciyla paylasilmaktadir; kullanim sorumlulugu tamamen kullanicidir.
-
----
-
-## Katkida Bulun
-
-Hata bildirimleri ve gelistirme onerileri icin [Issues](https://github.com/tarikelertarnak/ActivaterWindows/issues) sayfasini kullanabilirsin.
-
-**Yapan:** [Tariq Eler](https://github.com/tarikelertarnak)
+This tool is built on top of official Microsoft tools (ODT). The activation feature uses the community-developed **Microsoft Activation Scripts (MAS)** project (GPL-3.0, [massgrave/Microsoft-Activation-Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts)). Using unlicensed software is subject to your country's laws and Microsoft's terms of use. This project is shared for educational and personal use only; usage responsibility rests entirely with the user.
 
 ---
 
-## Lisans
+## Contributing
 
-MIT License - Detaylar icin [LICENSE](LICENSE) dosyasina bakin. Gomulu MAS scripti GPL-3.0 lisansli [Microsoft Activation Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts) projesinden alinmistir ve kaynak olarak belirtilir; aktivasyon sekmesi bu scriptin kilifidir.
+Use the [Issues](https://github.com/tarikelertarnak/ActivaterWindows/issues) page for bug reports and feature requests.
+
+**Made by:** [Tariq Eler](https://github.com/tarikelertarnak)
+
+---
+
+## License
+
+MIT License — see the [LICENSE](LICENSE) file for details. The embedded MAS script comes from the GPL-3.0 licensed [Microsoft Activation Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts) project and is credited as such; the activation tab is a wrapper around that script.

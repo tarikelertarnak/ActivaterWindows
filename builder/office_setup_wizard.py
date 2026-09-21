@@ -1708,14 +1708,13 @@ class App:
         self.separator = ttk.Separator(parent)
         self.separator.pack(fill="x", pady=(0, 12))
 
-        self.config_btn = ttk.Button(parent, text=self.t("config_edit"),
-                                     command=self._open_config_editor)
-        self.config_btn.pack(fill="x", pady=(0, 8))
-
         self.start_btn = ttk.Button(parent, text=self.t("start"), command=self._start)
         self.start_btn.pack(fill="x", pady=(0, 12))
 
         parent = root_parent
+        self.config_btn = ttk.Button(parent, text=self.t("config_edit"),
+                                     command=self._open_config_editor)
+        self.config_btn.pack(fill="x", pady=(0, 8))
         progress_frame = ttk.Frame(parent)
         progress_frame.pack(fill="x")
         self.progress = ttk.Progressbar(progress_frame, mode="determinate",
@@ -1901,12 +1900,14 @@ class App:
         self.act_combo = ttk.Combobox(
             act_frame, state="readonly",
             values=[self.t(key) for key, _ in ACT_METHODS])
-        self.act_combo.current(0)
+        all_idx = next((i for i, (k, _) in enumerate(ACT_METHODS)
+                        if k == "act_all"), 0)
+        self.act_combo.current(all_idx)
         self.act_combo.pack(fill="x", pady=(4, 0))
         self.act_combo.bind("<<ComboboxSelected>>", self._on_act_select)
 
         self.act_desc_lbl = tk.Label(
-            act_frame, text=self.t(self._act_desc_key(ACT_METHODS[0][0])),
+            act_frame, text=self.t(self._act_desc_key(ACT_METHODS[all_idx][0])),
             font=("Segoe UI", 8), fg=self.pal["hint"], bg=self.pal["bg"],
             justify="left", wraplength=500, anchor="w")
         self.act_desc_lbl.pack(fill="x", pady=(6, 0))
