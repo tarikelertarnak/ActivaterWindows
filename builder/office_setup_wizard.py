@@ -2104,12 +2104,12 @@ class App:
                  font=("Segoe UI", 9), wraplength=360, justify="center",
                  bg=self.pal["bg"], fg=self.pal["sub"]).pack(padx=20, pady=(2, 4))
 
-        link = tk.Label(win, text="github.com/TARIKELER-TARNAK/OfficeSetupWizard",
+        link = tk.Label(win, text="github.com/tarikelertarnak/OfficeSetupWizard",
                         font=("Segoe UI", 8, "underline"), cursor="hand2",
                         fg=self.pal["link"], bg=self.pal["bg"])
         link.pack(padx=20, pady=(4, 8))
         link.bind("<Button-1>", lambda e: open_url(
-            "https://github.com/TARIKELER-TARNAK/OfficeSetupWizard"))
+            "https://github.com/tarikelertarnak/OfficeSetupWizard"))
 
         ttk.Button(win, text="OK", command=win.destroy).pack(pady=(0, 12))
 

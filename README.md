@@ -48,7 +48,7 @@
 ### Kaynaktan Calistirma
 
 ```powershell
-git clone https://github.com/TARIKELER-TARNAK/OfficeSetupWizard.git
+git clone https://github.com/tarikelertarnak/OfficeSetupWizard.git
 cd OfficeSetupWizard
 python builder/office_setup_wizard.py
 ```
@@ -129,7 +129,7 @@ OfficeSetupWizard/
 
 ## Katkida Bulun
 
-Hata bildirimleri ve gelistirme onerileri icin [Issues](https://github.com/TARIKELER-TARNAK/OfficeSetupWizard/issues) sayfasini kullanabilirsin.
+Hata bildirimleri ve gelistirme onerileri icin [Issues](https://github.com/tarikelertarnak/OfficeSetupWizard/issues) sayfasini kullanabilirsin.
 
 **Yapan:** [Tariq Eler](https://github.com/TARIKELER-TARNAK)
 
