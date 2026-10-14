@@ -1,169 +1,126 @@
 # ActivaterWindows
 
-> **One-click Microsoft Office LTSC Professional Plus 2024 installer, with Windows, Office and ESU activation managed from a single interface.**
+> **Terminal-first Microsoft activator.** Windows, Office ve ESU aktivasyonu — tek satır, kalıcı yöntemler, MAS gücüyle.
 
-`ActivaterWindows` is a user-friendly **portable Windows desktop application** that wraps the Office Deployment Tool (ODT) to automate installation and uses **Microsoft Activation Scripts (MAS v3.12)** for one-click activation. A single `.exe` — no installation required, zero leftovers when deleted.
+```powershell
+irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
+```
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/python-3.8+-3776AB?style=flat-square&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/UI-Tkinter-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-2.0-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/size-%7E25KB-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/MAS-pinned%20%2B%20SHA256-red?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
-  <img src="https://img.shields.io/badge/ODT-16.0.20228-brightgreen?style=flat-square" />
-  <img src="https://img.shields.io/badge/MAS-3.12-red?style=flat-square" />
 </p>
 
 ---
 
-## Features
+## Neden v2.0 (Terminal Edition)?
 
-| Feature | Description |
+v1.0 tek bir PyInstaller `.exe` idi (19 MB). v2.0 altyapı sıfırdan değişti:
+
+| | v1.0 (exe) | v2.0 (terminal) |
+|---|---|---|
+| Boyut | 19 MB PE dosyası | **~25 KB** düz metin |
+| Antivirus algılama | Yüksek (paketlenmiş exe + lisans API çağrıları = klasik heuristic tuzağı) | **Çok düşük** (paketleme yok, imzalı uzak kaynak + SHA256 doğrulama, her satır okunabilir) |
+| Başlatma hızı | PyInstaller unpacking | Anında |
+| MAS özellikleri | Gömülü, sürüm donmuş (v3.12) | Pinned commit'ten doğrulanmış indirme — **tüm MAS özellikleri** (Troubleshoot, sürüm değiştirme, $OEM$ dahil) |
+| Kurulum | Yok | Yok |
+
+Antivirus notu: düz metin script + bütünlük doğrulaması, imzalı üç ayrı kaynak ve MAS'ın kendi resmi indirme yöntemini birebir kullanır — paketlenmiş binary olmadığı için reputation tabanlı taramalarda exe'ye göre çok daha az işaretlenir. Yine de 3. parti antivirus script indirmeyi engellerse script bunu algılar ve haber verir.
+
+---
+
+## Kullanım
+
+### Tek Satır (Önerilen)
+
+PowerShell'i aç, yapıştır:
+
+```powershell
+irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
+```
+
+Menü gelir. UAC izni gerektiğinde sorar.
+
+### Yerel Dosya
+
+1. `ActivaterWindows.cmd` + `ActivaterWindows.ps1` indir (aynı klasörde dursunlar)
+2. `ActivaterWindows.cmd`'ye çift tıkla
+
+### Doğrudan Yöntem (argümanlı)
+
+```powershell
+irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex   # interaktif menü
+.\ActivaterWindows.ps1 /HWID      # Windows HWID, menü olmadan
+.\ActivaterWindows.ps1 /Ohook     # Office Ohook
+.\ActivaterWindows.ps1 -Probe     # indirme + hash doğrulama testi (hiçbir şey çalıştırmaz)
+```
+
+---
+
+## Menü
+
+| # | Özellik | Yöntem | Süre |
+|---|---|---|---|
+| 1 | Windows 10/11 etkinleştirme | **HWID** (dijital lisans) | Kalıcı |
+| 2 | Office etkinleştirme (LTSC/365/C2R) | **Ohook** | Kalıcı |
+| 3 | Windows + ESU + Office | **TSforge** | Kalıcı |
+| 4 | Windows 10 ESU | **TSforge** | Kalıcı |
+| 5 | Windows / Office | **Online KMS** | 180 gün (otomatik yenileme) |
+| 6 | Aktivasyon durumu | MAS Check | — |
+| 7 | **TAM MAS menüsü** | Tüm özellikler: Troubleshoot, Windows/Office sürüm değiştirme, $OEM$ klasörü, changelog | — |
+| 8 | Office LTSC Pro Plus 2024 kurulumu | ODT + otomatik Ohook teklifi | — |
+
+### Güvenlik Mimarisi
+
+- **Pinned commit:** MAS AIO her zaman `05c4f881…` commit'inden indirilir — sürüm sürprizi yok.
+- **SHA256 doğrulama:** İndirilen her script, bilinen hash ile karşılaştırılır; uyuşmazsa **çalıştırılmaz**.
+- **3 ayna kaynak:** raw.githubusercontent → Azure DevOps → git.activated.win (rastgele sırayla denenir).
+- **Geçici dosya:** Çalıştırılan cmd `%TEMP%`'e yazılır, iş bitince silinir.
+
+---
+
+## Eski Sürüm (GUI exe)
+
+v1.0 Tkinter GUI'si (`builder/`, `resources/`)legacy olarak korunur: [Releases](https://github.com/tarikelertarnak/ActivaterWindows/releases) sayfasından `ActivaterWindows.exe` indirilebilir. Yeni geliştirme terminal sürümündedir.
+
+---
+
+## Teknik Detay
+
+| Bileşen | Kaynak |
 |---|---|
-| **Portable** | Single `.exe`, no installation, runs on any machine |
-| **Zero Leftover** | Temp files, logs, registry cleaned on exit |
-| **One-Click Installation** | Office LTSC Professional Plus 2024 in your language |
-| **Custom Configuration** | Use your own `Configuration.xml` file |
-| **38+ Languages** | tr-tr, en-us, de-de, fr-fr and more |
-| **Light/Dark Theme** | Automatic system theme detection |
-| **Embedded Activation (MAS)** | Windows / Office / ESU activation scripts are embedded in the exe — nothing is downloaded at runtime |
-| **Activation Type Selection** | Windows 11 Pro / for Workstations / 11 / 10 Pro / 10 + Office — 16 methods |
-| **Activation Status Check** | One-click current activation status |
-| **Automatic ODT Download** | Downloads ODT automatically if setup.exe is missing |
-| **Internet Check** | Verifies connectivity before installation |
+| Aktivasyon motoru | [Microsoft Activation Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts) (GPL-3.0), pinned `05c4f881` |
+| Office Deployment Tool | [aka.ms/odt](https://aka.ms/odt) (kurulumda ihtiyaç anında indirilir) |
+| Office LTSC Pro Plus 2024 | PerpetualVL2024 kanalı, x64 |
 
----
-
-## Usage
-
-### Portable Usage (Recommended)
-
-1. Download `ActivaterWindows.exe`
-2. Run it — that's it! **No installation required.**
-3. Required files are downloaded and installed automatically
-4. To remove, just delete `ActivaterWindows.exe` — **zero leftovers**
-
-### Run from Source
-
-```powershell
-git clone https://github.com/tarikelertarnak/ActivaterWindows.git
-cd ActivaterWindows
-python builder/office_setup_wizard.py
-```
-
-### Build (Standalone .exe)
-
-```powershell
-powershell -ExecutionPolicy Bypass -File builder/build.ps1
-```
-
-The built executable is placed in the `dist/` folder.
-
----
-
-## How to Use
-
-### Tab 1: Office Installation
-1. Choose **Installation Mode**: *Automatic* (LTSC 2024) or *Custom Configuration*
-2. Select the installation language (e.g. `tr-tr`, `en-us`)
-3. Press **Start Installation**
-4. Office is downloaded, installed and (optionally) activated with Ohook
-
-### Tab 2: Activation
-1. Choose an **Activation Type** (combobox, default: *All — Windows + ESU + Office*):
-   - `Windows 11 Pro — Permanent (HWID)`
-   - `Windows 11 Pro for Workstations — Permanent (HWID)`
-   - `Windows 11 Home / Windows 11 — Permanent (HWID)`
-   - `Windows 10 Pro / Home / Windows 10 — Permanent (HWID)`
-   - `Office LTSC/365 — Permanent (Ohook)`
-   - `Windows 7-11 + Server — Permanent (TSforge)`
-   - and more (ESU, Online KMS, uninstall)
-2. Press **Activate**
-3. Optionally verify with **Check Activation Status**
-
-> **Edit Configuration Settings** is always available below the tabs — it is kept out of the installation flow on purpose.
-
-### Cleanup
-
-All temporary files are automatically removed when the application closes:
-- `%TEMP%\ActivaterWindows\` folder
-- `%TEMP%\oi_debug.log` debug log
-- `%TEMP%\office_config.xml` configuration
-- `%TEMP%\MAS_*.cmd` / `%TEMP%\CheckAct_*.cmd` activation scripts (deleted after use)
-
-Deleting `ActivaterWindows.exe` leaves nothing behind.
-
----
-
-## Technical Details
-
-| Component | Version | Source |
-|---|---|---|
-| Office Deployment Tool | 16.0.20228.20124 | [aka.ms/odt](https://aka.ms/odt) |
-| Microsoft Activation Scripts | v3.12 | [massgrave.dev](https://massgrave.dev) |
-| Office LTSC Pro Plus 2024 | Volume License | PerpetualVL2024 channel |
-
-### Supported Applications
-
-Word, Excel, PowerPoint, Outlook, OneNote, Access, Publisher, Skype for Business, OneDrive, Visio, Project
-
-### Supported Languages
-
-38+ languages: Turkish, English, Deutsch, Français, Español, Italiano, Português, Nederlands, Polski, Русский, Українська, العربية, हिन्दी, Bahasa, ไทย, Tiếng Việt, 中文, 日本語, 한국어 and more.
-
-### Activation Methods (MAS v3.12)
-
-| Method | Scope | Duration |
-|---|---|---|
-| HWID | Windows 10/11 | Permanent (digital license) |
-| TSforge | Windows 7-11 + Server | Permanent |
-| ESU | Windows 10 (ESU) | Permanent |
-| Ohook | Office LTSC/365 | Permanent |
-| Online KMS | Windows / Office | 180 days (auto-renew task) |
-
----
-
-## Project Structure
+## Proje Yapısı
 
 ```
 ActivaterWindows/
-├── ActivaterWindows.exe                # Compiled portable application
-├── builder/
-│   ├── build.ps1                   # .exe build script
-│   ├── office_setup_wizard.py      # Main application
-│   ├── office_setup_wizard.spec    # PyInstaller spec (embeds MAS script)
-│   ├── office_setup_wizard.ico     # Application icon
-│   ├── version_info.txt            # Windows version info
-│   └── icons/                      # Theme icons
-│       ├── light/                  # Light theme icons
-│       └── dark/                   # Dark theme icons
-├── resources/
-│   ├── setup.exe                   # Office Deployment Tool
-│   ├── Configuration.xml           # Default configuration
-│   ├── configuration-Office365-x64.xml
-│   └── mas/
-│       ├── MAS_AIO.cmd             # Embedded activation script (v3.12)
-│       └── Check_Activation_Status.cmd
-├── LICENSE                         # MIT License
-└── README.md
+├── ActivaterWindows.ps1      # Terminal çekirdeği (tek dosya, ~25 KB)
+├── ActivaterWindows.cmd      # Çift tık başlatıcısı
+├── builder/                  # (legacy) v1.0 GUI exe kaynak kodu
+├── resources/                # (legacy) ODT + MAS v3.12 gömülü kopyalar
+└── mas-src/                  # (referans) MAS kaynak anlık görüntüsü
 ```
+
+## Sık Sorulanlar
+
+**Antivirus uyarısı verdi, ne yapmalıyım?** Windows Defender genellikle bırakır. 3. parti antivirus script indirmeyi engellerse: klasörü antivirus istisnasına ekle veya `irm … | iex` yöntemini kullan (dosya diske yazılmaz, only doğrulanıp cmd'ye geçilir).
+
+**Offline çalışır mı?** Hayır — aktivasyon scripti pinned kaynaktan indirilir (bütünlük için). v1.0 GUI exe gömülü MAS ile offline çalışır.
 
 ---
 
 ## Disclaimer
 
-This tool is built on top of official Microsoft tools (ODT). The activation feature uses the community-developed **Microsoft Activation Scripts (MAS)** project (GPL-3.0, [massgrave/Microsoft-Activation-Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts)). Using unlicensed software is subject to your country's laws and Microsoft's terms of use. This project is shared for educational and personal use only; usage responsibility rests entirely with the user.
+This project is a wrapper around the community-developed **Microsoft Activation Scripts (MAS)** (GPL-3.0, [massgrave/Microsoft-Activation-Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts)). Using unlicensed software is subject to your country's laws and Microsoft's terms of use. Educational and personal use only; usage responsibility rests entirely with the user.
 
----
-
-## Contributing
-
-Use the [Issues](https://github.com/tarikelertarnak/ActivaterWindows/issues) page for bug reports and feature requests.
-
-**Made by:** [Tariq Eler](https://github.com/tarikelertarnak)
-
----
+**Made by:** [Tarik Eler](https://github.com/tarikelertarnak)
 
 ## License
 
-MIT License — see the [LICENSE](LICENSE) file for details. The embedded MAS script comes from the GPL-3.0 licensed [Microsoft Activation Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts) project and is credited as such; the activation tab is a wrapper around that script.
+MIT — see [LICENSE](LICENSE). MAS is GPL-3.0 and credited above.
