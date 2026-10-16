@@ -1,5 +1,7 @@
 # ActivaterWindows
-# PowerShell + Windows 10/11. Aktivasyon: Microsoft Activation Scripts (pinned commit, SHA256 dogrulamali).
+# PowerShell + Windows 10/11. Aktivasyon motoru: masaustu kaynagindan otomatik izlenir (upstream commit+hash),
+# olmazsa gomulu pin, o da olmazsa son dogrulanmis yerel kopya. Her durumda SHA256 ile dogrulanir.
+# Metot adlari arayuzde gosterilmez; etkinlestirme arka planda (penceresiz) calisir.
 # Tek satir: irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
 # Yerel: ActivaterWindows.cmd (cift tik) veya powershell -ExecutionPolicy Bypass -File ActivaterWindows.ps1
 # Parametre: -Probe (indir+dogrula testi, calistirmadan cikar) | diger "/"-li argumanlar dogrudan MAS AIO'ya iletilir.
@@ -11,6 +13,9 @@ $SiteUrl  = 'https://tarikelertarnak.pages.dev/'
 $Pinned   = '05c4f881efec946c0040cdd552d1afa9a519704b' # MAS commit
 $AioHash  = '850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA'
 $ChkHash  = '6DF2937385386D0C9682D351797E674583A410F4792BB7BE45302F40AB90287E'
+$CacheDir = Join-Path $env:LOCALAPPDATA 'ActivaterWindows'
+$AioCache = Join-Path $CacheDir 'engine.cmd'
+$ChkCache = Join-Path $CacheDir 'check.cmd'
 $script:UiLang = 'auto' # 'auto' | 'tr' | 'en'
 
 # Office C2R desteklenen diller (alfabetik, numarali liste secimi icin)
@@ -34,13 +39,14 @@ $OfficeAppsRecommended = @('Word', 'Excel', 'PowerPoint')
 $Strings = @{
     tr = @{
         langline = 'Dil / Language :  [A] Otomatik (su an: {0})   [T] Turkce   [E] English'
-        m1 = '  [1] Windows 10/11 etkinlestir  - HWID    (kalici)'
-        m2 = '  [2] Office etkinlestir         - Ohook   (kalici)'
-        m3 = '  [3] Windows + ESU + Office     - TSforge (kalici)'
-        m4 = '  [4] Windows 10 ESU             - TSforge (kalici)'
+        m1 = '  [1] Windows 10/11 etkinlestir - kalici'
+        m2 = '  [2] Office etkinlestir        - kalici'
+        m3 = '  [3] Windows + ESU + Office    - kalici (tek gecis)'
+        m4 = '  [4] Windows 10 ESU            - kalici'
         m5 = '  [5] Aktivasyon durumu - kontrol et'
         m6 = '  [6] Office LTSC Pro Plus 2024 kur (dil + bilesen secimi)'
-        m7 = '  [7] HEPSINI ETKINLESTIR - Office kur + Windows/ESU/Office kalici + tam MAS menusu'
+        m7 = '  [7] HEPSINI ETKINLESTIR - mevcut her seyi kalici etkinlestir (kurulum yok)'
+        m8 = '  [8] HEPSINI YAP - eksikse Office kur + her seyi etkinlestir + tam MAS menusu'
         mx = '  [0] Cikis'
         ml = '  [L] Arayuz dilini degistir'
         choice = 'Secim'
@@ -79,22 +85,28 @@ $Strings = @{
         hash_fail2 = 'Kontrol scripti butunluk kontrolu basarisiz, iptal!'
         dl_fail = '{0} hicbir kaynaktan alinamadi. Antivirus/firewall baglantayi engelleyebilir.'
         tmp_fail = 'Gecici dosya olusturulamadi, iptal! ({0})'
-        all_start = 'HEPSINI YAP: ofis kurulu degilse kurulacak, sonra Windows + ESU + Office TSforge ile kalici etkinlestirilecek, en son durum raporu...'
+        all_start = 'HEPSINI YAP: ofis kurulu degilse kurulacak, sonra mevcut her sey kalici etkinlestirilecek, en son durum raporu...'
         all_nooffice = 'Office kurulu gorunmuyor. LTSC 2024 kurulsun mu? (E/h, bos = evet)'
         all_installing = 'Once Office kuruluyor...'
         all_masmenu = 'Tam MAS menusu de acilsin mi? (Troubleshoot, surum degistir, $OEM$...) (E/h)'
         all_done = 'Hepsini etkinlestirme turu bitti.'
-        ohook_ask = 'Office simdi Ohook ile etkinlestirilsin mi? (E/h)'
+        office_act_ask = 'Office simdi etkinlestirilsin mi? (E/h)'
+        act_start = 'Etkinlestirme basliyor - arka planda calisir, pencere acilmaz.'
+        act_nooffice = 'Office kurulu degil, Office etkinlestirme atlandi.'
+        using_cache = 'Motor uzaktan dogrulanamadi - son dogrulanmis yerel kopya kullaniliyor.'
+        engine_fail = 'Aktivasyon motoru hicbir kaynaktan alinamadi (ag/antivirus).'
+        status_lbl = 'Durum kontrolu'
     }
     en = @{
         langline = 'Dil / Language :  [A] Automatic (now: {0})   [T] Turkce   [E] English'
-        m1 = '  [1] Activate Windows 10/11  - HWID    (permanent)'
-        m2 = '  [2] Activate Office         - Ohook   (permanent)'
-        m3 = '  [3] Windows + ESU + Office  - TSforge (permanent)'
-        m4 = '  [4] Windows 10 ESU          - TSforge (permanent)'
+        m1 = '  [1] Activate Windows 10/11    - permanent'
+        m2 = '  [2] Activate Office           - permanent'
+        m3 = '  [3] Windows + ESU + Office    - permanent (single pass)'
+        m4 = '  [4] Windows 10 ESU            - permanent'
         m5 = '  [5] Check activation status'
         m6 = '  [6] Install Office LTSC Pro Plus 2024 (language + component picker)'
-        m7 = '  [7] ACTIVATE EVERYTHING - install Office + Windows/ESU/Office permanent + full MAS menu'
+        m7 = '  [7] ACTIVATE EVERYTHING - permanently activate everything present (no install)'
+        m8 = '  [8] DO EVERYTHING - install Office if missing + activate all + full MAS menu'
         mx = '  [0] Exit'
         ml = '  [L] Change interface language'
         choice = 'Choice'
@@ -133,12 +145,17 @@ $Strings = @{
         hash_fail2 = 'Checker integrity check FAILED, aborting!'
         dl_fail = '{0} could not be retrieved from any source. Antivirus/firewall may be blocking.'
         tmp_fail = 'Failed to create temp file, aborting! ({0})'
-        all_start = 'DO EVERYTHING: install Office if missing, then activate Windows + ESU + Office permanently via TSforge, then status report...'
+        all_start = 'DO EVERYTHING: install Office if missing, then permanently activate everything present, then status report...'
         all_nooffice = 'Office does not seem installed. Install LTSC 2024? (Y/n, blank = yes)'
         all_installing = 'Installing Office first...'
         all_masmenu = 'Also open the full MAS menu? (Troubleshoot, change edition, $OEM$...) (Y/n)'
         all_done = 'Activate-everything run finished.'
-        ohook_ask = 'Activate Office with Ohook now? (Y/n)'
+        office_act_ask = 'Activate Office now? (Y/n)'
+        act_start = 'Activation starting - runs in the background, no window opens.'
+        act_nooffice = 'Office is not installed, skipping Office activation.'
+        using_cache = 'Engine could not be verified remotely - using the last verified local copy.'
+        engine_fail = 'Activation engine could not be retrieved from any source (network/antivirus).'
+        status_lbl = 'Status check'
     }
 }
 
@@ -151,6 +168,21 @@ function Get-UiLang {
 function T([string]$Key) {
     $s = $Strings[(Get-UiLang)][$Key]
     if (-not $s) { $Key } else { $s }
+}
+
+# Turkce kulturde 'I' ile 'i' eslesmez: 'I'.ToLower() = 'ı' (noktasiz i). Bu yuzden
+# varsayilan -match/-like karsilastirmalari buyuk harfli metinde sessizce kacar (orn. "HWID").
+# Metin karsilastirmalarinda daima bu fonksiyonu kullan.
+function Test-Match([string]$Text, [string]$Pattern) {
+    [regex]::IsMatch($Text, $Pattern, [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [Text.RegularExpressions.RegexOptions]::CultureInvariant)
+}
+
+# Evet/hayir sorusu. TR: E = evet, EN: Y = yes. Enter = evet. Diger her giris = hayir.
+function Confirm([string]$Prompt) {
+    $ans = Read-Host $Prompt
+    if (-not $ans) { return $true }
+    if ((Get-UiLang) -eq 'tr') { return (Test-Match $ans '^\s*e(vet)?\s*$') }
+    Test-Match $ans '^\s*y(es)?\s*$'
 }
 
 function Write-Banner {
@@ -180,7 +212,7 @@ function Test-FullLanguageMode {
 function Warn-AV {
     $cmd = if ($PSVersionTable.PSVersion.Major -ge 3) { 'Get-CimInstance' } else { 'Get-WmiObject' }
     $av = & $cmd -Namespace root\SecurityCenter2 -Class AntiVirusProduct -ErrorAction SilentlyContinue |
-        Where-Object { $_.displayName -notlike '*windows*' } | Select-Object -ExpandProperty displayName
+        Where-Object { -not (Test-Match $_.displayName 'windows') } | Select-Object -ExpandProperty displayName
     if ($av) {
         Write-Host '3. parti antivirus scripti engelleyebilir:' -ForegroundColor White -BackgroundColor Blue -NoNewline
         Write-Host " $($av -join ', ')" -ForegroundColor DarkRed -BackgroundColor White
@@ -235,8 +267,8 @@ function Save-File([string]$Url, [string]$OutFile) {
     Invoke-Download $Url $OutFile | Out-Null
 }
 
-function Get-String([string[]]$Urls, [string]$Label) {
-    Write-Host $Label -ForegroundColor DarkGray
+function Get-String([string[]]$Urls, [string]$Label, [switch]$Quiet) {
+    if (-not $Quiet) { Write-Host $Label -ForegroundColor DarkGray }
     $errors = @(); $response = $null
     foreach ($url in $Urls | Sort-Object { Get-Random }) {
         try {
@@ -245,9 +277,11 @@ function Get-String([string[]]$Urls, [string]$Label) {
         } catch { $errors += $_ }
     }
     if (-not $response) {
-        Warn-AV
-        foreach ($e in $errors) { Write-Host "Hata: $($e.Exception.Message)" -ForegroundColor Red }
-        Write-Host ((T 'dl_fail') -f $Label) -ForegroundColor Red
+        if (-not $Quiet) {
+            Warn-AV
+            foreach ($e in $errors) { Write-Host "Hata: $($e.Exception.Message)" -ForegroundColor Red }
+            Write-Host ((T 'dl_fail') -f $Label) -ForegroundColor Red
+        }
     }
     $response
 }
@@ -259,34 +293,135 @@ function Test-Hash([string]$Text, [string]$Expected) {
     ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($stream)) -replace '-') -eq $Expected
 }
 
-function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label) {
-    $rand = [Guid]::NewGuid().Guid
-    $isAdmin = [bool]([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match 'S-1-5-32-544')
-    $file = if ($isAdmin) { "$env:SystemRoot\Temp\AW_$rand.cmd" } else { "$env:USERPROFILE\AppData\Local\Temp\AW_$rand.cmd" }
-    # ilk satirdaki @::: guidi cmd'nin -el ile kendi kendine yeniden calistirmasinda ilk satiri etkisizler
-    Set-Content -Path $file -Value "@::: $rand`r`n$Response"
-    if (-not (Test-Path $file)) { Warn-AV; Write-Host ((T 'tmp_fail') -f $Label) -ForegroundColor Red; return }
-    $env:ComSpec = "$env:SystemRoot\system32\cmd.exe"
+# Aktivasyon motorunun kaynagi. Sirasi:
+#   1) Upstream'in kendi bootstrap'i (get.activated.win) — commit + hash oradan okunur, boylece
+#      uygulama guncellenmese bile motor her zaman guncel kalir.
+#   2) Gomulu pin (commit + hash) — upstream'in formati degisirse bile calisir.
+#   3) Yerel onbellek — ag/upstream tamamen bozulsa bile son dogrulanmis kopya kullanilir.
+function Resolve-Engine {
+    # 1) upstream bootstrap -> guncel commit + hash
     try {
-        $p = Start-Process -FilePath $env:ComSpec -ArgumentList "/c """"$file"" -el $Arguments""" -Verb RunAs -Wait -PassThru
-        Write-Host ((T 'done') -f $Label, $p.ExitCode) -ForegroundColor Green
-    } catch {
-        Write-Host ((T 'uac_cancel2') -f $Label) -ForegroundColor Yellow
-    } finally {
-        Remove-Item -Path $file -ErrorAction SilentlyContinue
-    }
-}
+        $boot = Get-WebString 'https://get.activated.win'
+        if ($boot) {
+            $mUrl = [regex]::Match($boot, 'raw\.githubusercontent\.com/massgravel/Microsoft-Activation-Scripts/([0-9a-f]{40})/MAS/All-In-One-Version-KL/MAS_AIO\.cmd')
+            $mHsh = [regex]::Match($boot, "\`$releaseHash\s*=\s*'([0-9A-Fa-f]{64})'")
+            if ($mUrl.Success -and $mHsh.Success) {
+                $commit = $mUrl.Groups[1].Value
+                $hash = $mHsh.Groups[1].Value.ToUpper()
+                $urls = @(
+                    "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$commit/MAS/All-In-One-Version-KL/MAS_AIO.cmd",
+                    "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/All-In-One-Version-KL/MAS_AIO.cmd&versionType=Commit&version=$commit",
+                    "https://git.activated.win/Microsoft-Activation-Scripts/plain/MAS/All-In-One-Version-KL/MAS_AIO.cmd?id=$commit"
+                )
+                $aio = Get-String $urls (T 'mas_dl') -Quiet
+                if ($aio -and (Test-Hash $aio $hash)) {
+                    Save-Cache $aio $AioCache
+                    return @{ Text = $aio; Source = 'upstream'; Commit = $commit }
+                }
+            }
+        }
+    } catch { }
 
-function Invoke-MasAio([string]$Arguments = '') {
+    # 2) gomulu pin
     $urls = @(
         "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$Pinned/MAS/All-In-One-Version-KL/MAS_AIO.cmd",
         "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/All-In-One-Version-KL/MAS_AIO.cmd&versionType=Commit&version=$Pinned",
         "https://git.activated.win/Microsoft-Activation-Scripts/plain/MAS/All-In-One-Version-KL/MAS_AIO.cmd?id=$Pinned"
     )
     $aio = Get-String $urls (T 'mas_dl')
-    if (-not $aio) { return }
-    if (-not (Test-Hash $aio $AioHash)) { Write-Warning (T 'hash_fail'); return }
-    Invoke-MasCmd -Response $aio -Arguments $Arguments -Label $(if ($Arguments) { $Arguments.Trim('/') } else { 'MAS menu' })
+    if ($aio -and (Test-Hash $aio $AioHash)) {
+        Save-Cache $aio $AioCache
+        return @{ Text = $aio; Source = 'pin'; Commit = $Pinned }
+    }
+
+    # 3) yerel onbellek (son dogrulanmis kopya)
+    $cached = Read-Cache $AioCache
+    if ($cached) {
+        Write-Host (T 'using_cache') -ForegroundColor Yellow
+        return @{ Text = $cached; Source = 'cache'; Commit = $Pinned }
+    }
+
+    Write-Host (T 'engine_fail') -ForegroundColor Red
+    $null
+}
+
+function Save-Cache([string]$Text, [string]$Path) {
+    try {
+        if (-not (Test-Path $CacheDir)) { New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null }
+        [IO.File]::WriteAllText($Path, $Text)
+    } catch { }
+}
+
+function Read-Cache([string]$Path) {
+    try { if (Test-Path $Path) { return [IO.File]::ReadAllText($Path) } } catch { }
+    $null
+}
+
+# Aktivasyon ciktisindan kullaniciya gosterilecek satirlar.
+# Metot/marka adlari (motorun kendi adi, kaynak adresleri, lisans metinleri) filtrelenir.
+function Show-ActivationResult([string]$LogPath) {
+    if (-not $LogPath -or -not (Test-Path $LogPath)) { return }
+    try {
+        $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+        $txt = [IO.File]::ReadAllText($LogPath, $oem)
+    } catch { return }
+    # ANSI renk kodlarini temizle
+    $txt = [regex]::Replace($txt, '\x1B\[[0-9;?]*[A-Za-z]', '')
+    $txt = [regex]::Replace($txt, '\x1B[()][0-9A-B]', '')
+    $skip = '(?i)ohook|tsforge|kms38|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin'
+    $keep = '(?i)licens|activ|success|fail|error|tamamlan|etkin|windows|office|expire|product key'
+    $lines = @($txt -split "`r?`n" |
+        ForEach-Object { $_.Trim() } |
+        # cmd'nin ekrana bastigi komut satirlari (AW_<guid>.cmd> echo ...) kullaniciya cikmasin
+        Where-Object { $_ -and -not (Test-Match $_ '^[A-Za-z]:\\[^\r\n]*AW_[0-9a-f\-]{36}\.cmd>') -and -not (Test-Match $_ '^\s*>\s') } |
+        Where-Object { $_ -and -not (Test-Match $_ $skip) -and (Test-Match $_ $keep) })
+    if ($lines.Count -eq 0) { return }
+    Write-Host ''
+    foreach ($l in ($lines | Select-Object -Last 12)) { Write-Host "  $l" -ForegroundColor DarkGray }
+}
+
+function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [switch]$Visible) {
+    $rand = [Guid]::NewGuid().Guid
+    $isAdmin = [bool]([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match 'S-1-5-32-544')
+    $tmp = if ($isAdmin) { "$env:SystemRoot\Temp" } else { "$env:USERPROFILE\AppData\Local\Temp" }
+    $file = "$tmp\AW_$rand.cmd"
+    $log = "$tmp\AW_$rand.log"
+    # ilk satirdaki @::: guidi cmd'nin -el ile kendi kendine yeniden calistirmasinda ilk satiri etkisizler
+    Set-Content -Path $file -Value "@::: $rand`r`n$Response"
+    if (-not (Test-Path $file)) { Warn-AV; Write-Host ((T 'tmp_fail') -f $Label) -ForegroundColor Red; return }
+    $env:ComSpec = "$env:SystemRoot\system32\cmd.exe"
+    $hidden = -not $Visible
+    $redir = if ($hidden) { " > ""$log"" 2>&1" } else { '' }
+    $sp = @{
+        FilePath     = $env:ComSpec
+        ArgumentList = "/c """"$file"" -el $Arguments$redir"""
+        Verb         = 'RunAs'
+        Wait         = $true
+        PassThru     = $true
+    }
+    if ($hidden) { $sp['WindowStyle'] = 'Hidden' }
+    try {
+        $p = Start-Process @sp
+        if ($hidden) { Show-ActivationResult $log }
+        else { Write-Host ((T 'done') -f $Label, $p.ExitCode) -ForegroundColor Green }
+    } catch {
+        Write-Host ((T 'uac_cancel2') -f $Label) -ForegroundColor Yellow
+    } finally {
+        Remove-Item -Path $file -ErrorAction SilentlyContinue
+        Remove-Item -Path $log -ErrorAction SilentlyContinue
+    }
+}
+
+function Invoke-MasAio([string]$Arguments = '') {
+    $eng = Resolve-Engine
+    if (-not $eng) { return }
+    if ($Arguments) {
+        # metot cagrilari: pencere acilmaz, sonuc kendi filtremizden gecer
+        Invoke-MasCmd -Response $eng.Text -Arguments $Arguments -Label $Arguments.Trim('/')
+    } else {
+        # tam menu kullanicinin etkilesimi icin gorunur olmak zorunda
+        Invoke-MasCmd -Response $eng.Text -Arguments '' -Label 'menu' -Visible
+    }
 }
 
 function Invoke-MasCheck {
@@ -296,9 +431,14 @@ function Invoke-MasCheck {
         "https://git.activated.win/Microsoft-Activation-Scripts/plain/MAS/Separate-Files-Version/Check_Activation_Status.cmd?id=$Pinned"
     )
     $chk = Get-String $urls (T 'chk_dl')
-    if (-not $chk) { return }
-    if (-not (Test-Hash $chk $ChkHash)) { Write-Warning (T 'hash_fail2'); return }
-    Invoke-MasCmd -Response $chk -Arguments '' -Label $(if ((Get-UiLang) -eq 'tr') { 'Durum kontrolu' } else { 'Status check' })
+    if ($chk -and (Test-Hash $chk $ChkHash)) {
+        Save-Cache $chk $ChkCache
+    } else {
+        $chk = Read-Cache $ChkCache
+        if (-not $chk) { return }
+        Write-Host (T 'using_cache') -ForegroundColor Yellow
+    }
+    Invoke-MasCmd -Response $chk -Arguments '' -Label (T 'status_lbl')
 }
 
 function Test-OfficeC2R {
@@ -310,7 +450,7 @@ function Test-OfficeC2R {
 }
 
 function Default-OfficeLang {
-    $c = ((Get-Culture).Name).ToLower()
+    $c = ((Get-Culture).Name).ToLowerInvariant()
     if ($script:UiLang -eq 'tr') { 'tr-tr' }
     elseif ($script:UiLang -eq 'en') { 'en-us' }
     else { $c }
@@ -339,7 +479,7 @@ function Select-OfficeApps {
         Show-AppPicker $sel
         $in = Read-Host (T 'app_sel')
         if (-not $in) { break }
-        $low = $in.Trim().ToLower()
+        $low = $in.Trim().ToLowerInvariant()
         if ($low -eq 'a') { foreach ($a in $OfficeApps) { $sel[$a.id] = $true }; continue }
         if ($low -eq 'n') { foreach ($a in $OfficeApps) { $sel[$a.id] = $false }; continue }
         if ($low -eq 'r') { foreach ($a in $OfficeApps) { $sel[$a.id] = ($OfficeAppsRecommended -contains $a.id) }; continue }
@@ -390,12 +530,13 @@ function Resolve-OfficeLang {
             Write-Host (T 'invalid_lang') -ForegroundColor Red
             continue
         }
-        if ($in -match '^[a-z]{2}(-[a-z0-9]{2,8})?$') { return $in }
+        if (Test-Match $in '^[a-z]{2}(-[a-z0-9]{2,8})?$') { return $in.ToLowerInvariant() }
         Write-Host (T 'invalid_lang') -ForegroundColor Red
     }
 }
 
 function Install-OfficeLTSC {
+    param([switch]$SkipActivate)
     Write-Host ''
     Write-Host '--- Office LTSC Professional Plus 2024 ---' -ForegroundColor Cyan
     Write-Host (T 'mode_h') -ForegroundColor White
@@ -488,26 +629,38 @@ function Install-OfficeLTSC {
     }
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 
-    $ask = if ((Get-UiLang) -eq 'tr') { '^[HhYy]|^$' } else { '^[Yy]|^$' }
-    $act = Read-Host (T 'ohook_ask')
-    if ($act -match $ask) { Invoke-MasAio '/Ohook' }
+    if (-not $SkipActivate) {
+        if (Confirm (T 'office_act_ask')) { Invoke-MasAio '/Ohook' }
+    }
 }
 
+function Test-Win10 {
+    try { [int](Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).BuildNumber -lt 22000 }
+    catch { $false }
+}
+
+# [7] HEPSINI ETKINLESTIR — sadece etkinlestirme, kurulum yok.
+# Windows: kalici dijital lisans (guncellemelerden etkilenmez). Office: kalici. Win10'da ESU da.
+# Argumanlar tek geciste ve sira bagimsiz gonderilir; motor hangi sirada olursa olsun hepsini isler.
+function Invoke-AllActivate {
+    Write-Host ''
+    Write-Host (T 'act_start') -ForegroundColor Magenta
+    $methods = @('/HWID')
+    if (Test-OfficeC2R) { $methods += '/Ohook' } else { Write-Host (T 'act_nooffice') -ForegroundColor DarkYellow }
+    if (Test-Win10) { $methods += '/Z-ESU' }
+    Invoke-MasAio ($methods -join ' ')
+    Invoke-MasCheck
+}
+
+# [8] HEPSINI YAP — eksikse Office kur, sonra [7] akisini calistir, en son tam MAS menusunu teklif et.
 function Invoke-AllInOne {
     Write-Host ''
     Write-Host (T 'all_start') -ForegroundColor Magenta
     if (-not (Test-OfficeC2R)) {
-        $ask = if ((Get-UiLang) -eq 'tr') { '^[HhYy]|^$' } else { '^[Yy]|^$' }
-        $r = Read-Host (T 'all_nooffice')
-        if ($r -match $ask) { Write-Host (T 'all_installing') -ForegroundColor DarkGray; Install-OfficeLTSC }
+        if (Confirm (T 'all_nooffice')) { Write-Host (T 'all_installing') -ForegroundColor DarkGray; Install-OfficeLTSC -SkipActivate }
     }
-    # TSforge: Windows + ESU + Office hepsi tek geciste, kalici
-    Invoke-MasAio '/Z-WindowsESUOffice'
-    Invoke-MasCheck
-    # entegre: tam MAS menusu (Troubleshoot, surum degistir, $OEM$...) — hepsi bu akisin icinden
-    $ask = if ((Get-UiLang) -eq 'tr') { '^[HhYy]|^$' } else { '^[Yy]|^$' }
-    $m = Read-Host (T 'all_masmenu')
-    if ($m -match $ask) { Invoke-MasAio }
+    Invoke-AllActivate
+    if (Confirm (T 'all_masmenu')) { Invoke-MasAio }
     Write-Host (T 'all_done') -ForegroundColor Green
 }
 
@@ -535,6 +688,7 @@ function Show-Menu {
     Write-Host (T 'm5') -ForegroundColor White
     Write-Host (T 'm6') -ForegroundColor Cyan
     Write-Host (T 'm7') -ForegroundColor Magenta
+    Write-Host (T 'm8') -ForegroundColor Magenta
     Write-Host (T 'mx') -ForegroundColor DarkGray
     Write-Host (T 'ml') -ForegroundColor DarkGray
     Write-Host ''
@@ -546,10 +700,17 @@ function Show-Menu {
         '4' { Invoke-MasAio '/Z-ESU' }
         '5' { Invoke-MasCheck }
         '6' { Install-OfficeLTSC }
-        '7' { Invoke-AllInOne }
+        '7' { Invoke-AllActivate }
+        '8' { Invoke-AllInOne }
         '0' { return $true }
         'l' { Set-UiLang }
         'L' { Set-UiLang }
+        'a' { $script:UiLang = 'auto' }
+        'A' { $script:UiLang = 'auto' }
+        't' { $script:UiLang = 'tr' }
+        'T' { $script:UiLang = 'tr' }
+        'e' { $script:UiLang = 'en' }
+        'E' { $script:UiLang = 'en' }
         default { }
     }
     if ($choice -ne '0') { Write-Host ''; Read-Host (T 'back') | Out-Null; Show-Menu }
@@ -558,20 +719,62 @@ function Show-Menu {
 # --- giris ---
 if (-not (Test-FullLanguageMode)) { return }
 
+# Yerlesik kontroller: ag/kurulum/yetki gerektirmez. Ince davranislari (ozellikle
+# Turkce kulturde buyuk harfli metin eslesmesini) her surumde dogrular.
+if ($args -contains '-SelfTest') {
+    $fail = 0
+    function Assert([string]$Name, [bool]$Ok) {
+        if ($Ok) { Write-Host "  OK   $Name" -ForegroundColor Green }
+        else { Write-Host "  FAIL $Name" -ForegroundColor Red; $script:fail++ }
+    }
+    Write-Host 'SelfTest' -ForegroundColor Cyan
+    Write-Host ("  culture: " + (Get-Culture).Name)
+
+    # Turkce 'I' != 'i' tuzagi: bu satir duz -match ile gecmez, Test-Match ile gecmeli
+    Assert 'Test-Match buyuk harf (HWID)' (Test-Match 'HWID is here' 'hwid')
+    Assert 'Test-Match buyuk harf (OHOOK)' (Test-Match 'OHOOK' 'ohook')
+    Assert 'Test-Match buyuk harf (LICENSED)' (Test-Match 'Windows LICENSED' 'licens')
+    Assert 'Test-Match olumsuz' (-not (Test-Match 'nothing here' 'hwid'))
+
+    # cikti filtresi: metot adi sizmamali, sonuc satiri kalmali
+    $skip = '(?i)ohook|tsforge|kms38|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin'
+    $keep = '(?i)licens|activ|success|fail|error|tamamlan|etkin|windows|office|expire|product key'
+    $sample = @('Ohook Activation v3.0', 'TSforge Activation', 'HWID activation complete', 'Windows LICENSED', 'Office is activated.', 'ERROR: bad key')
+    $kept = @($sample | Where-Object { -not (Test-Match $_ $skip) -and (Test-Match $_ $keep) })
+    Assert 'filtre: metot adlari (buyuk harf dahil) duser' (@($kept | Where-Object { Test-Match $_ 'ohook|tsforge|hwid|microsoft activation' }).Count -eq 0)
+    Assert 'filtre: LICENSED/activated/ERROR kalir' ($kept.Count -eq 3)
+
+    # TR/EN anahtar paritesi
+    $tk = @($Strings['tr'].Keys); $ek = @($Strings['en'].Keys)
+    $diff = @(Compare-Object $tk $ek)
+    Assert 'TR/EN anahtar paritesi' ($diff.Count -eq 0)
+
+    # arayuz metinlerinde metot adi gecmemeli (her iki dil)
+    $leak = @()
+    foreach ($lg in @('tr', 'en')) {
+        foreach ($k in $Strings[$lg].Keys) {
+            if (Test-Match ([string]$Strings[$lg][$k]) 'ohook|tsforge|kms38|hwid|massgrave') { $leak += "$lg.$k" }
+        }
+    }
+    Assert ("arayuz metinleri temiz" + $(if ($leak) { " -> " + ($leak -join ',') } else { '' })) ($leak.Count -eq 0)
+
+    Write-Host $(if ($fail -eq 0) { 'SELFTEST OK' } else { "SELFTEST FAIL ($fail)" }) -ForegroundColor $(if ($fail -eq 0) { 'Green' } else { 'Red' })
+    if ($fail -eq 0) { exit 0 } else { exit 1 }
+}
+
 # "/"-li arguman varsa dogrudan AIO'ya aktar (orn: ActivaterWindows.ps1 /HWID)
 $forward = @($args) | Where-Object { $_ -match '^/' }
 if ($forward) { Invoke-MasAio ($forward -join ' '); return }
 
 if ($args -contains '-Probe') {
     Write-Banner
-    $urls = @(
-        "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$Pinned/MAS/All-In-One-Version-KL/MAS_AIO.cmd",
-        "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/All-In-One-Version-KL/MAS_AIO.cmd&versionType=Commit&version=$Pinned",
-        "https://git.activated.win/Microsoft-Activation-Scripts/plain/MAS/All-In-One-Version-KL/MAS_AIO.cmd?id=$Pinned"
-    )
-    $aio = Get-String $urls 'PROBE'
-    if ($aio -and (Test-Hash $aio $AioHash)) { Write-Host 'PROBE OK — MAS indirildi, hash dogrulandi.' -ForegroundColor Green; exit 0 }
-    else { Write-Host 'PROBE FAIL' -ForegroundColor Red; exit 1 }
+    $eng = Resolve-Engine
+    if ($eng) {
+        Write-Host ("PROBE OK - motor alindi ve SHA256 dogrulandi. kaynak={0} commit={1} boyut={2} bayt" -f $eng.Source, $eng.Commit, $eng.Text.Length) -ForegroundColor Green
+        exit 0
+    }
+    Write-Host 'PROBE FAIL' -ForegroundColor Red
+    exit 1
 }
 
 while ($true) { if (Show-Menu) { break } }

@@ -1,5 +1,73 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.1.0: [7]/[8] ayrildi, motor kademeli, etkinlestirme tamamen penceresiz
+
+### Degisiklikler
+
+**Menu yeniden ayrildi (Kai istegi):**
+- **[7] HEPSINI ETKINLESTIR** — *kurulum yok.* Mevcut olan her seyi kalici etkinlestirir:
+  Windows (dijital lisans) + Office (kuruluysa) + Windows 10'da ESU. Sonunda durum raporu.
+- **[8] HEPSINI YAP** — Office eksikse kurar (dil + bilesen secimi), sonra [7] akisini calistirir,
+  en son tam MAS menusunu teklif eder. (Kai: "Hepsini Etkinlestir icinde Office olmasin,
+  Officeli olan icin altina Hepsini Yap koy.")
+- Yontem argumanlari **tek gecis + sira bagimsiz** gonderilir (`Resolve-Engine` + `/HWID /Ohook /Z-ESU`).
+
+**Motor artik kendini guncel tutuyor (Kai: "guncellememe ragmen guncel kalir"):**
+- `Resolve-Engine` 3 kademeli: **1)** `get.activated.win` bootstrap'indan guncel commit + hash okunur →
+  her calistirmada upstream'in o anki surumu kullanilir. **2)** Olmazsa gomulu pin (`05c4f881`).
+  **3)** Olmazsa `%LOCALAPPDATA%\ActivaterWindows`'taki son dogrulanmis kopya.
+- Her kademede SHA256 zorunlu: bozuk/oynanmis indirme **asla** calistirilmaz, alt kademeye dusulur.
+- Boylece upstream arguman sirasini/formatini degistirse bile uygulama bozulmaz.
+
+**Yontem adlari arayuzden tamamen kaldirildi (Kai: "kullanici bilmesin"):**
+- Menu artik `[2] Office etkinlestir - kalici`; `HWID`/`TSforge`/`Ohook` yazmaz.
+- Etkinlestirme **penceresiz** calisir (`-WindowStyle Hidden`, cikti gecici gunluge alinir).
+  Motorun kendi penceresi/basligi/markasi kullaniciya hic gorunmez.
+- `Show-ActivationResult` gunlugu suzer: yalnizca sonuc satirlari (`Windows 11 Pro is LICENSED.`)
+  gosterilir; yontem/marka adlari, kaynak URL'ler, lisans metinleri ve cmd komut yankilari dusurulur.
+- GPL-3.0 atifi README/disclaimer'da **korunuyor** (lisans geregi); yalnizca arayuzde gosterilmiyor.
+
+### Bulunan ve duzeltilen gercek hatalar (olcumle)
+
+1. **Turkce "noktasiz i" tuzagi (kritik):** `'HWID'.ToLower()` bu makinede `hwıd` (U+0131) donduruyor.
+   `tr-TR` kulturunde .NET `I` != `i` sayiyor, yani `(?i)` iceren **tum** regex'ler buyuk harfli metinde
+   sessizce kaciyor. Kanit: `'HWID' -match 'hwid'` → **False**, `[regex]::IsMatch('HWID','d')` → **False**,
+   ama `'Hwid' -match 'hwid'` → True.
+   Etki: marka filtresi `Ohook`'u yakaliyor ama `HWID`/`LICENSED` satirlarini kaciriyordu; ilk test
+   bu yuzden **yanlis PASS** verdi. Cozum: `Test-Match` (IgnoreCase + **CultureInvariant**) ve
+   `ToLowerInvariant()`. Regresyon korumasi icin yerlesik `-SelfTest` eklendi.
+2. **Menude `[A]/[T]/[E]` dil kisayollari olu idi:** `langline` bu tuslari ilan ediyordu ama `switch`
+   yalnizca `l`/`L` isliyordu. Eklendi.
+3. **Evet/hayir semantigi tersti:** TR ipucu `(E/h)` diyordu ama desen `^[HhYy]|^$` idi —
+   yani **`h` (hayir) "evet" sayiliyor, `e` (evet) hic sayilmiyordu**. Tek `Confirm` helper'ina
+   indirildi: TR `E` = evet, EN `Y` = yes, Enter = evet, diger her sey hayir.
+4. **`Warn-AV`:** `-notlike '*windows*'` Turkce kulturde `WINDOWS DEFENDER` ile eslesmiyordu →
+   Defender 3. parti AV gibi listeleniyordu. Culture-invariant yapildi.
+5. **Office dil kodu:** `^[a-z]{2}(-...)$` buyuk harfli girisi (`TR-TR`) reddediyordu. Duzeltildi.
+6. `[8]` akisinda `Install-OfficeLTSC` gereksiz "Office etkinlestirilsin mi?" soruyordu; `-SkipActivate`
+   ile kaldirildi (zaten sonrasinda [7] hepsini etkinlestiriyor).
+
+### Dogrulama (olculen)
+
+| Test | Sonuc |
+|---|---|
+| `-SelfTest` (kultur tr-TR, filtre + parite + marka) | **8/8 OK**, `SELFTEST OK` |
+| Parse | `PARSE OK` |
+| Menu render TR+EN (culture-invariant marka taramasi) | `MENU tr/en OK` |
+| Cikti filtresi (MAS benzeri cikti, buyuk harfli) | marka yok, `LICENSED`/`activated`/`ERROR` korunuyor, komut yankisi dusuyor → `FILTER OK` |
+| `Confirm` semantigi (TR+EN, 11 girdi) | `CONFIRM SEMANTICS OK` |
+| Motor kademeleri (4 senaryo) | A: upstream olu → **pin**; B: tum ag olu → **cache**; C: bozuk icerik → **reddedildi, cache**; D: hicbiri yok → temiz hata → `ALL FALLBACK SCENARIOS OK` |
+| Canli upstream izleme | get.activated.win'den commit+hash okundu, indirildi, hash dogrulandi (`source=upstream`, commit `05c4f881…`, 761.964 bayt) |
+| **Gizli pencere (olcum)** | `RunAs` + `WindowStyle Hidden` ile `Win32_Process` taramasinda **pencere sayisi 0** (`MainWindowHandle=0`), yonlendirme + cikis kodu calisiyor → `NO WINDOW (hidden confirmed)` |
+
+### Bilinen sinirlar / riskler
+- **UAC penceresi gizlenemez** (Windows guvenlik siniri). Makinede `ConsentPromptBehaviorAdmin=0`
+  oldugu icin testte hic sorulmadi; normal makinede UAC gorunur, sonrasindaki konsol penceresi gizli.
+- Canli Office/Windows etkinlestirmesi **calistirilmadi** (sistem durumunu degistirir; kullanicinin
+  kendi testi). Bu yuzden "penceresiz + tam etkinlestirme" kombinasyonu birlikte degil, ayri ayri
+  dogrulandi (gizli pencere mekanigi / filtre / motor kademeleri).
+- Requirements kaynagi (ODT indirme linki) dis aga bagli; sayfa yapisi degisirse kurulum yedegi yok.
+
 ## 2026-10-16 — v2.0.5: Tam MAS menusu [7] icine entegre edildi, menu sadelesti
 
 ### Degisiklikler
