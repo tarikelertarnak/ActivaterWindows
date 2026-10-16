@@ -39,7 +39,12 @@ kurulumu sirasinda sadece yazi gorunuyor, cubuk yok, (3) renk/duzen/siralama iyi
   ve sayac dogru, varsayilan `Secili: 0 / 9`.
 - Gizli etkinlestirme regresyonu: zaman asimi testinde cubuk gorunuyor (`[####...] 4s`), surec agaci
   kapatiliyor, kalan cmd **0**, yeni yetim `choice.exe` **0** (8 → 8).
+- **ODT ayiklama canli testi:** kodun ayni deseni (`Start-Process -PassThru -WindowStyle Hidden` +
+  `Wait-WithBar`) gercek ODT ile calistirildi → cubuk akti, **2,2 sn**'de bitti, `setup.exe`
+  (**6,9 MB**) olustu, cikis kodu 0, gorunur ODT penceresi **0**, gecici dosya kalintisi **0**.
 - Motor kademeleri A/B/C/D/E OK; AST parse 0 hata.
+- Yayin sonrasi: uzak dosya = lokal = release asset (SHA256 `7372168D...`), canli `irm | iex` menusu
+  acildi, Latest = **v2.2.0**.
 
 ## 2026-10-16 — v2.1.3: yetim surec ve gecici dosya sizintilari kapatildi
 
