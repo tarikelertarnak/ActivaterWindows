@@ -1,5 +1,55 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.1.1: gizli calistirma kilitlenmesi + gunluk yaris durumu duzeltildi
+
+Onceki turun incelemesinde cikan ve **olcumle dogrulanan** iki gercek hata giderildi.
+
+### Duzeltilen hatalar
+
+1. **Gizli pencerede sonsuz kilitlenme (kritik).** `Check_Activation_Status.cmd:62` satirindaki
+   `choice /c 0 /n` gizli pencerede tus bekliyor; tus hic gelmeyince surec **sonsuza kadar asili kaliyordu**.
+   Yeniden uretildi: `exited=False after 8,9s`.
+   Cozum: gizli calistirmaya **900 sn** ust sinir (`$HiddenTimeoutSec`). Sure dolarsa surec
+   `Stop-Process -Force` ile kapatilir, gunluge yazilan sonuclar yine gosterilir, kullaniciya
+   "islem tamamlanmamis olabilir" uyarisi verilir.
+   Olcum (testte sinir 4 sn'ye cekildi): ~5,7 sn'de donuyor, durum satirlari goruntuleniyor,
+   **0 artik surec** kaliyor.
+
+2. **Gunluk okuma yarisi (sessiz sonuc kaybi).** Surec kapatilirken gunluk hala kilitli oldugu icin
+   `ReadAllText` "file is being used by another process" firlatiyordu; `try/catch` `$false` dondurdugu
+   icin **sonuclar sessizce kayboluyordu**. Cozum: paylasimli modda (`FileShare.ReadWrite`) ve
+   **30 x 200 ms** yeniden denemeli okuma.
+
+3. **Onbellek dogrulanmiyordu.** `%LOCALAPPDATA%\ActivaterWindows` kopyasi okunurken yalnizca varlik
+   kontrol ediliyordu. Artik kayit aninda alinan hash `.sha256` dosyasina yazilir ve okurken
+   **yeniden dogrulanir**; uyusmazsa onbellek reddedilir. Durust sinir: ayni kullanici olarak calisan
+   bir aktorun iki dosyayi birlikte degistirmesini engellemez — bu bir **dayaniklilik** yedegidir,
+   guven siniri degildir (README'de yazili).
+
+4. **Filtre sizintilari sikiistirildi** (gercek motor ciktisinda dogrulandi): `KMS4k`, `StaticCID`,
+   `ZeroCID`, `Switching To`, `method is not supported`, `choose a`, `select a`, `^\s*\[[0-9]\]`.
+
+### Bu turda ayrica eklenen
+
+- `Get-ResultLines` tek yere cikarildi; `Show-ActivationResult` ve `-SelfTest` **aynı** filtreyi kullanir
+  (iki kopya ayrisip yanlis PASS veremez).
+- `-Probe` artik gercek `Resolve-Engine` zincirini calistirir (ayri bir kopya yolunu degil).
+- Filtre hic satir birakmazsa "sonuc satiri yok" mesaji basar — **bos ekran ile basarisizlik karismaz**.
+
+### Dogrulama (olcumle)
+
+- Upstream takibi: `get.activated.win`'den commit `05c4f881...` + hash okundu, 761.964 bayt indirildi,
+  hash uyustu → `-Probe OK (source=upstream)`.
+- Penceresizlik: `RunAs` + `WindowStyle Hidden` → `Win32_Process` taramasinda **0 gorunur pencere`,
+  `MainWindowHandle=0`.
+- Motor kademeleri A (pin) / B (onbellek) / C (kurcalanmis icerik reddedildi) / D (temiz hata) → hepsi OK.
+- `-SelfTest` PowerShell 5.1 ve 7'de gecildi.
+
+### Kullanici tarafi
+
+- Tek satir komuta TLS 1.2 zorlamasi eklendi (stok Windows'ta `irm` baglanti hatasi vermesin diye).
+- README'ye "Her temiz Windows'ta calisir" bolumu eklendi (kurulan sey yok, kalici dosya yok).
+
 ## 2026-10-16 — v2.1.0: [7]/[8] ayrildi, motor kademeli, etkinlestirme tamamen penceresiz
 
 ### Degisiklikler

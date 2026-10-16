@@ -3,14 +3,15 @@
 > **Terminal-first Microsoft activator.** Windows, Office ve ESU aktivasyonu — tek satır, kalıcı yöntemler, MAS gücüyle.
 
 ```powershell
-irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
 ```
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
   <img src="https://img.shields.io/badge/version-2.1-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/size-%7E30KB-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/size-%7E41KB-success?style=flat-square" />
   <img src="https://img.shields.io/badge/engine-auto--tracked%20%2B%20SHA256-red?style=flat-square" />
+  <img src="https://img.shields.io/badge/deps-none%20required-lightgrey?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
 </p>
 
@@ -39,7 +40,7 @@ Antivirus notu: düz metin script + bütünlük doğrulaması, imzalı üç ayr�
 PowerShell'i aç, yapıştır:
 
 ```powershell
-irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
 ```
 
 Menü gelir. UAC izni gerektiğinde sorar.
@@ -52,7 +53,7 @@ Menü gelir. UAC izni gerektiğinde sorar.
 ### Doğrudan Yöntem (argümanlı)
 
 ```powershell
-irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex   # interaktif menü
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex   # interaktif menü
 .\ActivaterWindows.ps1 /HWID       # yöntem adıyla, menü olmadan
 .\ActivaterWindows.ps1 -Probe      # indirme + hash doğrulama testi (hiçbir şey çalıştırmaz)
 .\ActivaterWindows.ps1 -SelfTest   # yerleşik kontroller (ağ/kurulum/yetki gerektirmez)
@@ -77,16 +78,33 @@ irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/Acti
 > Menü yalnızca **ne yapacağını** yazar, **hangi yöntemle** yaptığını yazmaz. Yöntem adları arayüzde hiç görünmez.
 > Online KMS (180 gün) kaldırıldı — kalıcı yöntemler var. İhtiyaç halinde **8**'deki tam MAS menüsünden erişilir.
 
+### Her temiz Windows'ta çalışır
+
+Ek bir şey kurmaya gerek yoktur:
+
+| | |
+|---|---|
+| Gereken | Windows 10/11 (PowerShell 5.1 **sistemle gelir**), internet, yönetici yetkisi (UAC) |
+| Kurulan | Hiçbir şey. Ne .NET paketi, ne çalışma zamanı, ne `choco`, ne derleyici |
+| Yazılan | Geçici bir `.cmd` + günlüğü; işlem bitince silinir. Kalıcı dosya **yok** |
+| Eski Windows | PowerShell 2.0 / Windows 7-8 desteklenmez (TLS 1.2 zorunlu) |
+
+Komut `irm | iex` ile çalıştığı için `ExecutionPolicy` ayarı da gerekmez. TLS 1.2 komutun içinde açıkça zorlanır; eski sürüm/varsayılanlar yüzünden `irm` bağlantı hatası alan makinelerde bu satır sorunu çözer.
+
 ### Görünmez etkinleştirme
 
 Etkinleştirme arka planda, **hiçbir pencere açılmadan** çalışır. Motorun kendi çıktısı geçici bir günlüğe alınır; yalnızca sonuç satırları süzülüp gösterilir:
 
 ```
-  Office is permanently activated.
   Windows 11 Pro is LICENSED.
+  Office is permanently activated.
 ```
 
-Süzgeç, yöntem/marka adlarını ve cmd komut yankılarını kullanıcıya göstermez. UAC penceresi (yerinde açıksa) görünür olmaya devam eder — bu bir güvenlik sınırıdır ve gizlenemez.
+Süzgeç yalnızca **gizlilik** içindir, güvenlik sınırı değildir: yöntem/marka adları, kaynak adresleri, lisans metinleri ve cmd komut yankıları düşürülür, sonuc/uyarı satırları korunur.
+
+**Zaman sınırı:** motorun bazı akışları sonda bir tuşa bekler (`choice /c 0 /n`). Gizli pencerede o tuş bekleyemez, yani süreç sonsuza kadar asılı kalırdı — bu yüzden gizli çalıştırmada **900 sn** üst sınırı uygulanır: süre dolarsa süreç kapatılır, günlüğe yazılan sonuçlar yine gösterilir ve kullanıcıya "işlem tamamlanmamış olabilir" uyarısı verilir. Filtre hiç satır bırakmazsa da "sonuç satırı yok" mesajı basılır; böylece **boş ekran ile başarısızlık birbirine karışmaz**.
+
+UAC penceresi görünür kalır; bu bir güvenlik sınırıdır ve gizlenemez. UAC onaylanmadan hiçbir şey çalışmaz.
 
 
 ### Office dili seçimi
@@ -129,21 +147,23 @@ Tüm indirmelerde gerçek yüzde çubugu + saniye sayacı:
 
 ### Güvenlik Mimarisi
 
-Motor üç kademeli olarak çözülür; **her kademede SHA256 doğrulaması zorunludur**:
+Motor üç kademeli olarak çözülür. İlk iki kademe **bilinen SHA256** ile doğrulanır; üçüncü kademe, kaydedildiği anda alınan hash ile yeniden doğrulanır:
 
-| Kademe | Kaynak | Neden |
-|---|---|---|
-| 1 | Upstream'in kendi bootstrap'ı (`get.activated.win`) → güncel commit + hash oradan okunur | Uygulama güncellenmese bile motor güncel kalır |
-| 2 | Gövdeye gömülü pin (commit + hash) | Upstream formatı/argüman sırası değişirse çalışmaya devam eder |
-| 3 | Son doğrulanmış yerel kopya (`%LOCALAPPDATA%\ActivaterWindows`) | Ağ/antivirus tamamen engellese bile doğrulanmış kopya kullanılır |
+| Kademe | Kaynak | Doğrulama | Neden |
+|---|---|---|---|
+| 1 | Upstream'in kendi bootstrap'ı (`get.activated.win`) → o anki commit + hash | Bootstrap'tan okunan SHA256 | Uygulama güncellenmese bile motor güncel kalır |
+| 2 | Gövdeye gömülü pin (commit + hash) | Gömülü SHA256 | Upstream formatı/argüman sırası değişirse çalışmaya devam eder |
+| 3 | Yerel önbellek (`%LOCALAPPDATA%\ActivaterWindows`) | Kayıt anındaki SHA256 | Ağ/antivirus tamamen engellese bile çalışır |
 
-- **SHA256 doğrulama:** Hash uyuşmayan indirme **asla çalıştırılmaz** (bozulmuş/oynanmış içerik reddedilir).
+- **SHA256 doğrulama:** İlk iki kademede hash uyuşmayan içerik **asla çalıştırılmaz** — bozulmuş/oynanmış indirme reddedilir ve alt kademeye düşülür.
 - **3 ayna kaynak:** raw.githubusercontent → Azure DevOps → git.activated.win (rastgele sırayla denenir).
 - **Argüman sırasından bağımsız:** yöntem argümanları tek geçişte gönderilir; motor hangi sırayla işlerse işlesin hepsi uygulanır.
-- **Geçici dosya:** Çalıştırılan cmd `%TEMP%`'e yazılır, iş bitince silinir.
-- **Yerleşik kontroller:** `-SelfTest` ağ/yetki gerektirmeden filtre, dil paritesi ve marka sızıntısını doğrular.
+- **Geçici dosya:** Çalıştırılan cmd geçici klasöre yazılır (yönetici ise `%SystemRoot%\Temp`, değilse `%TEMP%`), iş bitince silinir.
+- **Yerleşik kontroller:** `-SelfTest` ağ/yetki gerektirmeden filtre, dil paritesi ve marka sızıntısını doğrular; `-Probe` motoru indirip hash'ini doğrular.
 
-> Not: Bu kademeler *kaynak bulma* dayanıklılığıdır. Motor (MAS) GPL-3.0 lisanslıdır ve kaynak koda atıf README/disclaimer'da korunur — arayüzde gösterilmemesi lisansı etkilemez.
+> **Dürüst sınır (3. kademe):** Yerel önbellek kendi yanındaki `.sha256` dosyasıyla doğrulanır; bu **bozulmayı ve sonradan değiştirilmeyi** yakalar, ama aynı kullanıcı olarak çalışan bir saldırganın iki dosyayı birlikte değiştirmesini engellemez. Zaten yönetici yetkisi olan bir aktör bu kapsamın dışındadır. Bu kademe bir dayanıklılık yedeğidir, bir güven sınırı değildir.
+
+> Not: Motor (MAS) GPL-3.0 lisanslıdır ve kaynak koda atıf README/disclaimer'da korunur — arayüzde gösterilmemesi lisansı etkilemez.
 
 
 ---

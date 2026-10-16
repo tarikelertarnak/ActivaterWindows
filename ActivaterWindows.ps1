@@ -15,7 +15,11 @@ $AioHash  = '850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA'
 $ChkHash  = '6DF2937385386D0C9682D351797E674583A410F4792BB7BE45302F40AB90287E'
 $CacheDir = Join-Path $env:LOCALAPPDATA 'ActivaterWindows'
 $AioCache = Join-Path $CacheDir 'engine.cmd'
+$AioCacheHash = Join-Path $CacheDir 'engine.sha256'
 $ChkCache = Join-Path $CacheDir 'check.cmd'
+$ChkCacheHash = Join-Path $CacheDir 'check.sha256'
+# Gizli calisan motorun ust siniri (saniye). Sonda tus bekleyen akislar bu sure sonunda kapatilir.
+$HiddenTimeoutSec = 900
 $script:UiLang = 'auto' # 'auto' | 'tr' | 'en'
 
 # Office C2R desteklenen diller (alfabetik, numarali liste secimi icin)
@@ -93,9 +97,11 @@ $Strings = @{
         office_act_ask = 'Office simdi etkinlestirilsin mi? (E/h)'
         act_start = 'Etkinlestirme basliyor - arka planda calisir, pencere acilmaz.'
         act_nooffice = 'Office kurulu degil, Office etkinlestirme atlandi.'
-        using_cache = 'Motor uzaktan dogrulanamadi - son dogrulanmis yerel kopya kullaniliyor.'
+        using_cache = 'DIKKAT: dogrulanmis uzak kaynak yok - yerel onbellekteki motor kullaniliyor.'
         engine_fail = 'Aktivasyon motoru hicbir kaynaktan alinamadi (ag/antivirus).'
         status_lbl = 'Durum kontrolu'
+        act_timeout = 'Motor {0} saniyede bitmedi ve kapatildi. Yukarida sonuc yoksa islem tamamlanmamis olabilir.'
+        act_nolog = 'Motor calisti ama bildirilecek sonuc satiri yok. Ayrinti icin [5] durum kontrolunu kullan.'
     }
     en = @{
         langline = 'Dil / Language :  [A] Automatic (now: {0})   [T] Turkce   [E] English'
@@ -153,9 +159,11 @@ $Strings = @{
         office_act_ask = 'Activate Office now? (Y/n)'
         act_start = 'Activation starting - runs in the background, no window opens.'
         act_nooffice = 'Office is not installed, skipping Office activation.'
-        using_cache = 'Engine could not be verified remotely - using the last verified local copy.'
+        using_cache = 'WARNING: no verified remote source - using the locally cached engine.'
         engine_fail = 'Activation engine could not be retrieved from any source (network/antivirus).'
         status_lbl = 'Status check'
+        act_timeout = 'The engine did not finish within {0}s and was terminated. If no result is shown above, the operation may be incomplete.'
+        act_nolog = 'The engine ran but produced no reportable result line. Use [5] status check for details.'
     }
 }
 
@@ -286,11 +294,15 @@ function Get-String([string[]]$Urls, [string]$Label, [switch]$Quiet) {
     $response
 }
 
-function Test-Hash([string]$Text, [string]$Expected) {
+function Get-Sha256([string]$Text) {
     $stream = New-Object IO.MemoryStream
     $writer = New-Object IO.StreamWriter $stream
     $writer.Write($Text); $writer.Flush(); $stream.Position = 0
-    ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($stream)) -replace '-') -eq $Expected
+    ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($stream)) -replace '-')
+}
+
+function Test-Hash([string]$Text, [string]$Expected) {
+    (Get-Sha256 $Text) -eq $Expected
 }
 
 # Aktivasyon motorunun kaynagi. Sirasi:
@@ -315,7 +327,7 @@ function Resolve-Engine {
                 )
                 $aio = Get-String $urls (T 'mas_dl') -Quiet
                 if ($aio -and (Test-Hash $aio $hash)) {
-                    Save-Cache $aio $AioCache
+                    Save-Cache $aio $AioCache $AioCacheHash
                     return @{ Text = $aio; Source = 'upstream'; Commit = $commit }
                 }
             }
@@ -330,12 +342,12 @@ function Resolve-Engine {
     )
     $aio = Get-String $urls (T 'mas_dl')
     if ($aio -and (Test-Hash $aio $AioHash)) {
-        Save-Cache $aio $AioCache
+        Save-Cache $aio $AioCache $AioCacheHash
         return @{ Text = $aio; Source = 'pin'; Commit = $Pinned }
     }
 
-    # 3) yerel onbellek (son dogrulanmis kopya)
-    $cached = Read-Cache $AioCache
+    # 3) yerel onbellek (son dogrulanmis kopya) — icerik, kaydedilen hash ile yeniden dogrulanir
+    $cached = Read-Cache $AioCache $AioCacheHash
     if ($cached) {
         Write-Host (T 'using_cache') -ForegroundColor Yellow
         return @{ Text = $cached; Source = 'cache'; Commit = $Pinned }
@@ -345,39 +357,68 @@ function Resolve-Engine {
     $null
 }
 
-function Save-Cache([string]$Text, [string]$Path) {
+function Save-Cache([string]$Text, [string]$Path, [string]$HashPath) {
     try {
         if (-not (Test-Path $CacheDir)) { New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null }
         [IO.File]::WriteAllText($Path, $Text)
+        if ($HashPath) { [IO.File]::WriteAllText($HashPath, (Get-Sha256 $Text)) }
     } catch { }
 }
 
-function Read-Cache([string]$Path) {
-    try { if (Test-Path $Path) { return [IO.File]::ReadAllText($Path) } } catch { }
+# Yerel kurcalama/bozulmayi yakalar: icerik, kaydedildigi andaki hash ile uyusmazsa onbellek reddedilir.
+function Read-Cache([string]$Path, [string]$HashPath) {
+    try {
+        if (-not (Test-Path $Path)) { return $null }
+        $text = [IO.File]::ReadAllText($Path)
+        if ($HashPath -and (Test-Path $HashPath)) {
+            $want = ([IO.File]::ReadAllText($HashPath)).Trim().ToUpperInvariant()
+            if ((Get-Sha256 $text) -ne $want) { return $null }
+        }
+        return $text
+    } catch { }
     $null
 }
 
 # Aktivasyon ciktisindan kullaniciya gosterilecek satirlar.
 # Metot/marka adlari (motorun kendi adi, kaynak adresleri, lisans metinleri) filtrelenir.
-function Show-ActivationResult([string]$LogPath) {
-    if (-not $LogPath -or -not (Test-Path $LogPath)) { return }
-    try {
-        $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
-        $txt = [IO.File]::ReadAllText($LogPath, $oem)
-    } catch { return }
+# Filtre (tek kaynak): kullaniciya gosterilecek satirlari secer. Sonuc/uyari satirlari kalir;
+# metot/marka adlari, yontem secim metinleri, kaynak adresleri, lisans metinleri ve cmd komut
+# yankilari dusurulur. `-SelfTest` bu fonksiyonu aynen test eder.
+function Get-ResultLines([string]$Text) {
+    if (-not $Text) { return @() }
     # ANSI renk kodlarini temizle
-    $txt = [regex]::Replace($txt, '\x1B\[[0-9;?]*[A-Za-z]', '')
-    $txt = [regex]::Replace($txt, '\x1B[()][0-9A-B]', '')
-    $skip = '(?i)ohook|tsforge|kms38|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin'
+    $t = [regex]::Replace($Text, '\x1B\[[0-9;?]*[A-Za-z]', '')
+    $t = [regex]::Replace($t, '\x1B[()][0-9A-B]', '')
+    $skip = '(?i)ohook|tsforge|kms38|kms4k|kms4|staticcid|zerocid|scid|zcid|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin|switching to|method is not supported|choose a|select a|^\s*\[[0-9]\]'
     $keep = '(?i)licens|activ|success|fail|error|tamamlan|etkin|windows|office|expire|product key'
-    $lines = @($txt -split "`r?`n" |
+    @($t -split "`r?`n" |
         ForEach-Object { $_.Trim() } |
         # cmd'nin ekrana bastigi komut satirlari (AW_<guid>.cmd> echo ...) kullaniciya cikmasin
         Where-Object { $_ -and -not (Test-Match $_ '^[A-Za-z]:\\[^\r\n]*AW_[0-9a-f\-]{36}\.cmd>') -and -not (Test-Match $_ '^\s*>\s') } |
         Where-Object { $_ -and -not (Test-Match $_ $skip) -and (Test-Match $_ $keep) })
-    if ($lines.Count -eq 0) { return }
+}
+
+function Show-ActivationResult([string]$LogPath) {
+    if (-not $LogPath -or -not (Test-Path $LogPath)) { return $false }
+    # Surec zorla sonlandirildiginda gunlugun yazma tutucusu hala kapanmis olmayabilir;
+    # o zaman ReadAllText IOException firlatir (içerik aslinda orada). Paylasimli ac + kisa tekrar.
+    $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+    $txt = $null
+    for ($i = 0; $i -lt 30; $i++) {
+        try {
+            $fs = [IO.File]::Open($LogPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            $sr = New-Object IO.StreamReader($fs, $oem)
+            $txt = $sr.ReadToEnd()
+            $sr.Close(); $fs.Close()
+            break
+        } catch { $txt = $null; Start-Sleep -Milliseconds 200 }
+    }
+    if (-not $txt) { return $false }
+    $lines = @(Get-ResultLines $txt)
+    if ($lines.Count -eq 0) { return $false }
     Write-Host ''
     foreach ($l in ($lines | Select-Object -Last 12)) { Write-Host "  $l" -ForegroundColor DarkGray }
+    $true
 }
 
 function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [switch]$Visible) {
@@ -396,14 +437,27 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
         FilePath     = $env:ComSpec
         ArgumentList = "/c """"$file"" -el $Arguments$redir"""
         Verb         = 'RunAs'
-        Wait         = $true
         PassThru     = $true
     }
-    if ($hidden) { $sp['WindowStyle'] = 'Hidden' }
+    if ($hidden) { $sp['WindowStyle'] = 'Hidden' } else { $sp['Wait'] = $true }
     try {
-        $p = Start-Process @sp
-        if ($hidden) { Show-ActivationResult $log }
-        else { Write-Host ((T 'done') -f $Label, $p.ExitCode) -ForegroundColor Green }
+        if ($hidden) {
+            # Motor bazi akislarda sonda tus bekler (or. durum kontrolu `choice /c 0 /n`).
+            # Gizli pencerede tus bekleyen surec sonsuza kadar asili kalir; bu yuzden sinirli bekle:
+            # cikti zaten gecici gunluge yazilmis olur, sonra surec sonlandirilir.
+            $p = Start-Process @sp
+            if (-not $p.WaitForExit($HiddenTimeoutSec * 1000)) {
+                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+                Write-Host ((T 'act_timeout') -f $HiddenTimeoutSec) -ForegroundColor DarkYellow
+            }
+            if (-not (Show-ActivationResult $log)) {
+                # filtre hicbir satir birakmadi: "hic cikti yok" ile "basarisiz" ayni gorunmesin
+                Write-Host (T 'act_nolog') -ForegroundColor DarkGray
+            }
+        } else {
+            $p = Start-Process @sp
+            Write-Host ((T 'done') -f $Label, $p.ExitCode) -ForegroundColor Green
+        }
     } catch {
         Write-Host ((T 'uac_cancel2') -f $Label) -ForegroundColor Yellow
     } finally {
@@ -432,9 +486,9 @@ function Invoke-MasCheck {
     )
     $chk = Get-String $urls (T 'chk_dl')
     if ($chk -and (Test-Hash $chk $ChkHash)) {
-        Save-Cache $chk $ChkCache
+        Save-Cache $chk $ChkCache $ChkCacheHash
     } else {
-        $chk = Read-Cache $ChkCache
+        $chk = Read-Cache $ChkCache $ChkCacheHash
         if (-not $chk) { return }
         Write-Host (T 'using_cache') -ForegroundColor Yellow
     }
@@ -736,13 +790,37 @@ if ($args -contains '-SelfTest') {
     Assert 'Test-Match buyuk harf (LICENSED)' (Test-Match 'Windows LICENSED' 'licens')
     Assert 'Test-Match olumsuz' (-not (Test-Match 'nothing here' 'hwid'))
 
-    # cikti filtresi: metot adi sizmamali, sonuc satiri kalmali
-    $skip = '(?i)ohook|tsforge|kms38|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin'
-    $keep = '(?i)licens|activ|success|fail|error|tamamlan|etkin|windows|office|expire|product key'
-    $sample = @('Ohook Activation v3.0', 'TSforge Activation', 'HWID activation complete', 'Windows LICENSED', 'Office is activated.', 'ERROR: bad key')
-    $kept = @($sample | Where-Object { -not (Test-Match $_ $skip) -and (Test-Match $_ $keep) })
-    Assert 'filtre: metot adlari (buyuk harf dahil) duser' (@($kept | Where-Object { Test-Match $_ 'ohook|tsforge|hwid|microsoft activation' }).Count -eq 0)
-    Assert 'filtre: LICENSED/activated/ERROR kalir' ($kept.Count -eq 3)
+    # cikti filtresi — GERCEK fonksiyon (Get-ResultLines) test edilir, kopya degil:
+    # metot adlari sizmamali, sonuc/uyari satirlari kalmali
+    $engineOut = @(
+        'Ohook Activation v3.0',
+        'TSforge Activation',
+        'HWID activation complete',
+        'Microsoft Activation Scripts (MAS)',
+        'https://massgrave.dev/troubleshoot',
+        'Switching To KMS4k activation...        <- should drop',
+        'KMS4k method is not supported on this build',
+        'In builds 26100 and later, the script will auto select StaticCID',
+        'Fork activation method                 [ZeroCID]',
+        'Choose activation method:',
+        '  [2] StaticCID',
+        'C:\Users\x\AppData\Local\Temp\AW_11111111-2222-3333-4444-555555555555.cmd>echo installing',
+        'Windows 11 Pro is LICENSED.',
+        'Office LTSC Plus 2024 is activated.',
+        'ERROR: something went wrong'
+    )
+    $kept = @(Get-ResultLines ($engineOut -join "`r`n"))
+    $joined = $kept -join "`n"
+    $leaky = @($kept | Where-Object { Test-Match $_ 'ohook|tsforge|hwid|kms|staticcid|zerocid|microsoft activation|massgrave|activated\.win|github\.com|^\s*\[[0-9]\]|AW_11111' })
+    Assert ("filtre: metot/yontem adlari duser" + $(if ($leaky) { " -> " + ($leaky -join ' | ') } else { '' })) ($leaky.Count -eq 0)
+    Assert 'filtre: LICENSED kalir'      (Test-Match $joined 'is LICENSED')
+    Assert 'filtre: activated kalir'     (Test-Match $joined 'is activated')
+    Assert 'filtre: ERROR kalir'         (Test-Match $joined 'ERROR: something went wrong')
+    Assert 'filtre: cmd yankisi duser'   (-not (Test-Match $joined 'echo installing'))
+    Assert 'filtre: bom bos cikti'       (-not [bool]@(Get-ResultLines '').Count)
+
+    # gizli calistirma asilmasin diye zaman asimi tanimli ve makul
+    Assert 'gizli zaman asimi tanimli' ([int]$HiddenTimeoutSec -gt 60)
 
     # TR/EN anahtar paritesi
     $tk = @($Strings['tr'].Keys); $ek = @($Strings['en'].Keys)
@@ -753,7 +831,7 @@ if ($args -contains '-SelfTest') {
     $leak = @()
     foreach ($lg in @('tr', 'en')) {
         foreach ($k in $Strings[$lg].Keys) {
-            if (Test-Match ([string]$Strings[$lg][$k]) 'ohook|tsforge|kms38|hwid|massgrave') { $leak += "$lg.$k" }
+            if (Test-Match ([string]$Strings[$lg][$k]) 'ohook|tsforge|kms38|kms4k|staticcid|zerocid|hwid|massgrave') { $leak += "$lg.$k" }
         }
     }
     Assert ("arayuz metinleri temiz" + $(if ($leak) { " -> " + ($leak -join ',') } else { '' })) ($leak.Count -eq 0)
