@@ -1,5 +1,25 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.0.1: ilk test turu düzeltmeleri (banner, dil, ODT indirme)
+
+### Düzeltmeler (Kai'nin test raporu)
+- **Banner'da sürüm numarası kaldırıldı:** "ActivaterWindows v2.0 — Terminal" → "ActivaterWindows — Terminal".
+- **Dil seçimi otomatik + Enter:** Sistem kültür adı (`(Get-Culture).Name`, örn. `tr-tr`) default olarak
+  prompt'ta gösteriliyor; boş Enter artık onu kullanıyor. "degistirmek istemiyorsan Enter'a bas" ipucu eklendi.
+- **ODT indirme hatalı kaynaktı → düzeltildi:**
+  - `aka.ms/odt` artık doğrudan `.exe`'ye değil **dokumantasyon sayfasına** gidiyordu (HTML → "dosya çok küçük" hatası).
+  - `confirmation.aspx?id=49117` **404** döndü (Microsoft kaldırmış).
+  - Yeni kaynak: `details.aspx?id=49117` sayfasındaki gerçek link regex'le çekiliyor
+    (test edildi: `download.microsoft.com/download/6c1eeb25-.../officedeploymenttool_20326-20112.exe`).
+  - **Yerel kopya önce:** `resources/officedeploymenttool*.exe` varsa internete dokunmadan oradan kullanılıyor
+    (bu sayede offline çalışır).
+- **Boyut eşiği `5MB` → `2MB`:** Gerçek ODT 3.4 MB çıktı; 5MB eşiği sahte "yanlış içerik" hatası üretirdi.
+
+### Doğrulama
+- Parse: `PARSE OK`.
+- ODT uçtan uca testi: `LINK: download.microsoft.com/...officedeploymenttool_20326-20112.exe` →
+  `SIZE: 3.4 MB` → `EXTRACT OK: setup.exe 7026 KB` → `LOCAL OK: officedeploymenttool_20131-20090.exe` → `ODT TEST OK`.
+
 ## 2026-10-15 — v2.0.0: Terminal Edition — altyapı sıfırdan değişti (irm|iex, hafif, AV-dostu)
 
 ### Neden

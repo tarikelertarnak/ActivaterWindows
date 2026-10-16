@@ -14,7 +14,7 @@ $ChkHash  = '6DF2937385386D0C9682D351797E674583A410F4792BB7BE45302F40AB90287E'
 function Write-Banner {
     Write-Host ''
     Write-Host '==========================================================' -ForegroundColor DarkCyan
-    Write-Host '  ActivaterWindows v2.0 — Terminal' -ForegroundColor Cyan
+    Write-Host '  ActivaterWindows — Terminal' -ForegroundColor Cyan
     Write-Host "  $RepoUrl" -ForegroundColor DarkGray
     Write-Host '==========================================================' -ForegroundColor DarkCyan
 }
@@ -121,29 +121,42 @@ function Invoke-MasCheck {
 function Install-OfficeLTSC {
     Write-Host ''
     Write-Host '--- Office LTSC Professional Plus 2024 Kurulumu ---' -ForegroundColor Cyan
-    Write-Host '[1] Onerilen (hafif): Word, Excel, PowerPoint, OneDrive haric bilesenler kirilir'
+    Write-Host '[1] Onerilen (hafif): Word, Excel, PowerPoint, OneDrive haric bilesenler kurulmaz'
     Write-Host '[2] Tam paket: tum bilesenler'
     $mode = Read-Host 'Secim (1/2)'
-    $lang = Read-Host 'Dil kodu (ornek: tr-tr, en-us) [tr-tr]'
-    if (-not $lang) { $lang = 'tr-tr' }
-    if ($lang -notmatch '^[a-z]{2}(-[A-Za-z0-9]{2,4})?$') { Write-Host 'Gecersiz dil kodu.' -ForegroundColor Red; return }
+    $sysLang = ((Get-Culture).Name).ToLower()
+    $lang = Read-Host "Dil kodu [otomatik secildi: $sysLang — degistirmek istemiyorsan Enter'a bas]"
+    if (-not $lang) { $lang = $sysLang }
+    if ($lang -notmatch '^[a-z]{2}(-[a-z0-9]{2,8})?$') { Write-Host 'Gecersiz dil kodu.' -ForegroundColor Red; return }
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
     New-Item -ItemType Directory -Path $work -Force | Out-Null
-    Write-Host 'Office Deployment Tool indiriliyor (aka.ms/odt)...' -ForegroundColor DarkGray
     $odt = Join-Path $work 'odt.exe'
-    try {
-        if ($PSVersionTable.PSVersion.Major -ge 3) {
-            Invoke-WebRequest -Uri 'https://aka.ms/odt' -OutFile $odt -UseBasicParsing
-        } else {
-            (New-Object Net.WebClient).DownloadFile('https://aka.ms/odt', $odt)
-        }
-    } catch {
-        Write-Host "ODT indirilemedi: $($_.Exception.Message)" -ForegroundColor Red
-        Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-        return
+
+    # 1) repo icindeki yerel kopya (script dosyasiyla birlikte calisirken)
+    $local = $null
+    if ($PSScriptRoot) {
+        $local = Get-ChildItem -Path (Join-Path $PSScriptRoot 'resources') -Filter 'officedeploymenttool*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
     }
-    if ((Get-Item $odt).Length -lt 1MB) { Write-Host 'ODT indirilen dosya cok kucuk (yanlis icerik), iptal.' -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
+    if ($local) {
+        Write-Host "ODT yerel kopyadan aliniyor: $($local.Name)" -ForegroundColor DarkGray
+        Copy-Item $local.FullName $odt
+    } else {
+        # 2) MS indirme sayfasindan dogrudan .exe linki (aka.ms/odt artik sadece dokumantasyona gider)
+        Write-Host 'Office Deployment Tool indiriliyor (microsoft.com)...' -ForegroundColor DarkGray
+        try {
+            $conf = Invoke-WebRequest -Uri 'https://www.microsoft.com/en-us/download/details.aspx?id=49117' -UseBasicParsing
+            $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', 'IgnoreCase').Value
+            if (-not $link) { throw 'indirme linki sayfada bulunamadi' }
+            if ($PSVersionTable.PSVersion.Major -ge 3) { Invoke-WebRequest -Uri $link -OutFile $odt -UseBasicParsing }
+            else { (New-Object Net.WebClient).DownloadFile($link, $odt) }
+        } catch {
+            Write-Host "ODT indirilemedi: $($_.Exception.Message)" -ForegroundColor Red
+            Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+            return
+        }
+    }
+    if ((Get-Item $odt).Length -lt 2MB) { Write-Host 'ODT indirilen dosya yanlis icerik, iptal.' -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
     Write-Host 'ODT ayiklaniyor...' -ForegroundColor DarkGray
     Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait
@@ -190,7 +203,7 @@ function Install-OfficeLTSC {
     }
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 
-    $act = Read-Host 'Offici simdi Ohook ile etkinlestir? (E/h)'
+    $act = Read-Host 'Office''i simdi Ohook ile etkinlestir? (E/h)'
     if ($act -match '^[EeYy]|^$') { Invoke-MasAio '/Ohook' }
 }
 
