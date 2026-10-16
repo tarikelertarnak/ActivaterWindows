@@ -10,7 +10,7 @@
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 $Version  = '2.5.0'
-$Author   = 'Tarık Eler'
+$Author   = 'TARIK ELER'
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
 $SiteUrl  = 'https://tarikelertarnak.pages.dev/'
 $ShortUrl = 'https://tarikelertarnak.github.io/aw.ps1'
@@ -78,7 +78,7 @@ $Strings = @{
         mode_head = 'Kurulum modu:'
         langpick = 'Dil:  [1] Otomatik (su an: {0})  [2] Turkce  [3] English'
         olang = 'Office dili: kod yaz (ornek: tr-tr) veya asagidaki listeden numara sec [otomatik: {0}]'
-        olang_confirm = '{0}) {1} — onayliyor musun? Enter = evet, 0 = geri'
+        olang_confirm = '{0}) {1} - onayliyor musun? Enter = evet, 0 = geri'
         lang_head = 'Office dilleri (alfabetik):'
         mode_h = '  [1] Onerilen (hafif) : sadece Word, Excel, PowerPoint kurulur'
         mode_t = '  [2] Tam paket         : tum bilesenler kurulur'
@@ -128,7 +128,7 @@ $Strings = @{
         act_timeout = 'Motor {0} saniyede bitmedi ve kapatildi. Yukarida sonuc yoksa islem tamamlanmamis olabilir.'
         act_nolog = 'Motor calisti ama bildirilecek sonuc satiri yok. Ayrinti icin [5] durum kontrolunu kullan.'
 
-        author = 'Tarık Eler'
+        author = 'TARIK ELER'
         sec_win = 'WINDOWS'
         sec_off = 'OFFICE'
         sec_all = 'BIRLESIK'
@@ -164,6 +164,12 @@ $Strings = @{
         win_change_ask_go = 'Surum degistirme araci acilsin mi? (E/h)'
         ce_dl = 'Surum degistirme araci indiriliyor'
         ce_fail = 'Surum degistirme araci alinamadi, iptal.'
+        win_change_title = 'Surum degistir - surum secin'
+        win_change_cur   = 'Su anki surum: {0}'
+        win_change_rec   = '[x] (oneri - su anki surum)'
+        win_change_sel   = 'Numarayla secin, sonra Enter:'
+        win_change_next  = '10) Digere bak (kalan surumleri goster)'
+        win_change_back  = '0) Geri'
     }
     en = @{
         langline = 'Dil / Language :  [A] Automatic (now: {0})   [T] Turkce   [E] English'
@@ -184,7 +190,7 @@ $Strings = @{
         mode_head = 'Install mode:'
         langpick = 'Language:  [1] Automatic (now: {0})  [2] Turkce  [3] English'
         olang = 'Office language: type a code (e.g. tr-tr) or pick a number from the list below [auto: {0}]'
-        olang_confirm = '{0}) {1} — confirm? Enter = yes, 0 = back'
+        olang_confirm = '{0}) {1} - confirm? Enter = yes, 0 = back'
         lang_head = 'Office languages (alphabetical):'
         mode_h = '  [1] Recommended (light) : only Word, Excel, PowerPoint install'
         mode_t = '  [2] Full                : every component installs'
@@ -234,7 +240,7 @@ $Strings = @{
         act_timeout = 'The engine did not finish within {0}s and was terminated. If no result is shown above, the operation may be incomplete.'
         act_nolog = 'The engine ran but produced no reportable result line. Use [5] status check for details.'
 
-        author = 'Tarık Eler'
+        author = 'TARIK ELER'
         sec_win = 'WINDOWS'
         sec_off = 'OFFICE'
         sec_all = 'COMBINED'
@@ -270,6 +276,12 @@ $Strings = @{
         win_change_ask_go = 'Open the edition changer? (Y/n)'
         ce_dl = 'Downloading the edition changer'
         ce_fail = 'The edition changer could not be retrieved, aborting.'
+        win_change_title = 'Change edition - pick one'
+        win_change_cur   = 'Current edition: {0}'
+        win_change_rec   = '[x] (recommended - current edition)'
+        win_change_sel   = 'Pick by number, then Enter:'
+        win_change_next  = '10) See more (show remaining editions)'
+        win_change_back  = '0) Back'
     }
 }
 
@@ -531,7 +543,7 @@ function Get-FileSha256([string]$Path) {
     ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes($Path))) -replace '-')
 }
 
-# A usable ODT is big enough AND starts with the PE magic "MZ" — a size check alone would accept any
+# A usable ODT is big enough AND starts with the PE magic "MZ" - a size check alone would accept any
 # large file (an HTML error page saved to disk, a truncated download, a captive-portal response).
 function Test-OdtFile([string]$Path) {
     try {
@@ -543,7 +555,7 @@ function Test-OdtFile([string]$Path) {
     } catch { $false }
 }
 
-# Office Deployment Tool acquisition — Microsoft's own downloader, four tiers, each verified before use:
+# Office Deployment Tool acquisition - Microsoft's own downloader, four tiers, each verified before use:
 #   1) resources/ next to this script (only when running from a repo checkout)
 #   2) Microsoft's download page, scraped (Microsoft's documented route; the URL changes per build)
 #   3) the pinned Microsoft URL (survives a redesigned download page); hash-checked
@@ -597,7 +609,7 @@ function Get-OdtTool([string]$OutFile) {
 
 
 
-#   2) Gomulu pin (commit + hash) — upstream'in formati degisirse bile calisir.
+#   2) Gomulu pin (commit + hash) - upstream'in formati degisirse bile calisir.
 
 function Resolve-Engine {
     
@@ -1047,7 +1059,7 @@ function Test-Win10 {
     ($wi.Build -gt 0 -and $wi.Build -lt 22000)
 }
 
-# [7] ACTIVATE EVERYTHING — activation only, no install.
+# [7] ACTIVATE EVERYTHING - activation only, no install.
 # Windows: permanent digital license (survives updates). Office: permanent. Plus ESU on Windows 10.
 # Arguments go in a single order-independent pass; the engine handles them in any order.
 function Invoke-AllActivate {
@@ -1060,7 +1072,7 @@ function Invoke-AllActivate {
     Invoke-MasCheck
 }
 
-# [8] DO EVERYTHING — install Office when missing, then the [7] flow, then offer the full engine menu.
+# [8] DO EVERYTHING - install Office when missing, then the [7] flow, then offer the full engine menu.
 function Invoke-AllInOne {
     Write-Host ''
     Write-Host (T 'all_start') -ForegroundColor Magenta
@@ -1089,7 +1101,7 @@ function Set-UiLang {
     $script:WinInfo = $null   # the summary line is translated, so rebuild it in the new language
 }
 
-# [9] About — version, author, license, and where the engine comes from.
+# [9] About - version, author, license, and where the engine comes from.
 function Show-About {
     Clear-Host
     Write-Banner
@@ -1107,39 +1119,107 @@ function Show-About {
     [void](Read-Input '')
 }
 
+# Edition info: tech id -> friendly name + short purpose. ASCII-safe Turkish.
+function Get-EditionInfo([string]$TechId) {
+    switch ($TechId) {
+        'Core'              { @{ Name='Windows 11 Home';           Desc='Gunluk kullanim, oyun   (ev kullanicilari)' } }
+        'CoreSingleLanguage'{ @{ Name='Windows 11 Home Tek Dil';   Desc='Tek goruntuleme dili   (Home varyanti)' } }
+        'Professional'      { @{ Name='Windows 11 Pro';            Desc='Gelismis yonetim, BitLocker, Hyper-V   (yazilimcilar, ileri kullanicilar)' } }
+        'ProfessionalEducation'{ @{ Name='Windows 11 Pro Education'; Desc='Egitim odakli Pro   (okular, ogrenciler)' } }
+        'Education'         { @{ Name='Windows 11 Education';      Desc='Egitim kurumlari icin gelismis ozellikler   (okular, universiteler)' } }
+        'Enterprise'        { @{ Name='Windows 11 Enterprise';     Desc='Kurumsal guvenlik ve yonetim   (buyuk sirketler)' } }
+        'ProfessionalWorkstation'{ @{ Name='Windows 11 Pro for Workstations'; Desc='Agir is yuklu, profesyonel donanim   (is istasyonlari)' } }
+        'IoTEnterprise'     { @{ Name='Windows IoT Enterprise';    Desc='Endustriyel / ozel amacli cihazlar   (ureticiler)' } }
+        'CloudEdition'      { @{ Name='Windows 11 Cloud Edition';  Desc='Ozel bulut odakli dagitimlar' } }
+        'ServerRdsh'        { @{ Name='Windows 11 Coklu Oturum';   Desc='Sanal masaustu ve coklu oturum' } }
+        default             { @{ Name=$TechId; Desc='' } }
+    }
+}
+
 # Edition change. The engine's own changer holds the product-key logic per edition and its own
 # verified list, so it is delegated to (in a visible window, because it needs interactive input).
 # Reimplementing that here would risk putting the machine on a wrong edition.
 function Invoke-ChangeEdition {
-    $eds = Get-EditionList
-    Write-Host ''
-    if ($eds.Count) {
-        Write-Host ('  ' + ((T 'win_eds') -f $eds.Count)) -ForegroundColor Cyan
-        for ($i = 0; $i -lt $eds.Count; $i++) {
-            Write-Host ('    {0,2}) {1}' -f ($i + 1), $eds[$i]) -ForegroundColor Gray
-        }
-    } else {
+    $eds = @(Get-EditionList)
+    if (-not $eds.Count) {
+        Write-Host ''
         Write-Host ('  ' + (T 'win_eds_none')) -ForegroundColor DarkYellow
+        Write-Host ''
+        if (-not (Confirm (T 'win_change_ask_go'))) { return }
+        $launchOnly = $true
+    } else {
+        $launchOnly = $false
     }
-    Write-Host ('  ' + (T 'win_eds_note')) -ForegroundColor DarkGray
-    Write-Host ''
-    if (-not (Confirm (T 'win_change_ask_go'))) { return }
 
-    $eng = Resolve-Engine
-    if (-not $eng) { return }
-    # Same commit as the already verified engine, so the companion file is anchored to that commit.
-    $urls = @(
-        "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$($eng.Commit)/MAS/Separate-Files-Version/Change_Windows_Edition.cmd",
-        "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/Separate-Files-Version/Change_Windows_Edition.cmd&versionType=Commit&version=$($eng.Commit)"
-    )
-    $ce = Get-String $urls (T 'ce_dl')
-    if (-not $ce -or -not (Test-Match $ce ':cedmenu2')) {
-        Write-Host (T 'ce_fail') -ForegroundColor Red
+    $wi = Get-WinInfo
+    $currentTech = $wi.Edition
+    $page = 0; $pageSize = 9
+    while ($true) {
+        Clear-Host
+        Write-Banner
+        Write-Host ''
+        Write-Host ('  ' + (T 'win_change_title')) -ForegroundColor Cyan
+        Write-Host ('  ' + ((T 'win_change_cur') -f $currentTech)) -ForegroundColor DarkGray
+        Write-Host ''
+        $shownAny = $false
+        if (-not $launchOnly) {
+            $start = $page * $pageSize
+            $end   = [Math]::Min($start + $pageSize, $eds.Count)
+            for ($i = $start; $i -lt $end; $i++) {
+                $info = Get-EditionInfo $eds[$i]
+                $isRec = ($eds[$i] -eq $currentTech)
+                $mark  = if ($isRec) { '[x]' } else { '[ ]' }
+                $tag   = if ($isRec) { '  ' + (T 'win_change_rec') } else { '' }
+                Write-Host ('  {0,2}) {1}  {2,-34}{3}{4}' -f ($i + 1), $mark, $info.Name, $info.Desc, $tag) -ForegroundColor Gray
+                $shownAny = $true
+            }
+            Write-Host ''
+        }
+        $hasMore = (-not $launchOnly) -and ($end -lt $eds.Count)
+        if ($hasMore) {
+            Write-Host ('  10) ' + (T 'win_change_next')) -ForegroundColor DarkGray
+        }
+        Write-Host ('  0) ' + (T 'win_change_back')) -ForegroundColor DarkGray
+        Write-Host ''
+        Write-Host ('  ' + (T 'win_change_sel')) -ForegroundColor Yellow
+        $r = Read-Input ''
+        if ($r.Back) { return }
+        $sel = $r.Text.Trim()
+        if (-not $sel) { continue }
+        if ($sel -eq '0') { return }
+        if ($sel -eq '10' -and $hasMore) { $page++; continue }
+        if ($launchOnly) {
+            Write-Host ('  Surum listesi gecersiz - motorun kendi penceresi listeler.') -ForegroundColor Red
+            Start-Sleep -Milliseconds 700
+            continue
+        }
+        $n = [int]$sel
+        if ($n -lt 1 -or $n -gt $eds.Count -or $n -le $start -or $n -gt $end) {
+            Write-Host ('  Gecersiz secim.') -ForegroundColor Red
+            Start-Sleep -Milliseconds 700
+            continue
+        }
+        $pickTech = $eds[$n - 1]
+        Write-Host ''
+        if (-not (Confirm (T 'win_change_ask_go'))) { continue }
+
+        $eng = Resolve-Engine
+        if (-not $eng) { return }
+        # Same commit as the already verified engine, so the companion file is anchored to that commit.
+        $urls = @(
+            "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$($eng.Commit)/MAS/Separate-Files-Version/Change_Windows_Edition.cmd",
+            "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/Separate-Files-Version/Change_Windows_Edition.cmd&versionType=Commit&version=$($eng.Commit)"
+        )
+        $ce = Get-String $urls (T 'ce_dl')
+        if (-not $ce -or -not (Test-Match $ce ':cedmenu2')) {
+            Write-Host (T 'ce_fail') -ForegroundColor Red
+            return
+        }
+        Write-Host (T 'win_change_go') -ForegroundColor Yellow
+        Invoke-MasCmd -Response $ce -Arguments '' -Label 'edition' -Visible
+        if (Confirm (T 'win_change_ask')) { Invoke-MasAio '/HWID' }
         return
     }
-    Write-Host (T 'win_change_go') -ForegroundColor Yellow
-    Invoke-MasCmd -Response $ce -Arguments '' -Label 'edition' -Visible
-    if (Confirm (T 'win_change_ask')) { Invoke-MasAio '/HWID' }
 }
 
 # [1] Windows. A submenu, because "activate Windows" and "change which edition I am on, then
@@ -1214,7 +1294,7 @@ function Show-MainMenu {
 }
 
 # Main loop. Iterative, not recursive: every action returns here, and Esc inside a submenu just
-# lands back here — no need to restart the app after a wrong pick.
+# lands back here - no need to restart the app after a wrong pick.
 function Invoke-Main {
     while ($true) {
         Show-MainMenu

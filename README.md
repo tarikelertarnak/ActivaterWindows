@@ -15,7 +15,7 @@ irm https://tarikelertarnak.github.io/aw.ps1 | iex
   <a href="https://github.com/tarikelertarnak/ActivaterWindows/releases/latest"><img src="https://img.shields.io/github/v/release/tarikelertarnak/ActivaterWindows?style=flat-square&label=release" /></a>
 </p>
 
-**Made by Tarık Eler** — [tarikelertarnak.pages.dev](https://tarikelertarnak.pages.dev/) · [github.com/tarikelertarnak/ActivaterWindows](https://github.com/tarikelertarnak/ActivaterWindows)
+**Made by TARIK ELER** — [tarikelertarnak.pages.dev](https://tarikelertarnak.pages.dev/) · [github.com/tarikelertarnak/ActivaterWindows](https://github.com/tarikelertarnak/ActivaterWindows)
 
 ---
 
@@ -283,7 +283,7 @@ The v1.0 Tkinter GUI (`builder/`, `resources/`) is kept as legacy, but it is **n
 
 This project is a wrapper around the community-developed **Microsoft Activation Scripts (MAS)** (GPL-3.0, [massgrave/Microsoft-Activation-Scripts](https://github.com/massgravel/Microsoft-Activation-Scripts)). Using unlicensed software is subject to your country's laws and Microsoft's terms of use. Educational and personal use only; usage responsibility rests entirely with the user.
 
-**Made by:** [Tarık Eler](https://tarikelertarnak.pages.dev/) · [github.com/tarikelertarnak](https://github.com/tarikelertarnak)
+**Made by:** [TARIK ELER](https://tarikelertarnak.pages.dev/) · [github.com/tarikelertarnak](https://github.com/tarikelertarnak)
 
 ## License
 
