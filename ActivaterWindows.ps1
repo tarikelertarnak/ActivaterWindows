@@ -449,6 +449,9 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
             # cikti zaten gecici gunluge yazilmis olur, sonra surec sonlandirilir.
             $p = Start-Process @sp
             if (-not $p.WaitForExit($HiddenTimeoutSec * 1000)) {
+                # Stop-Process yalnizca cmd.exe'yi oldurur; motor (ve onun timeout/choice cocuklari)
+                # yasamaya devam eder -> gizli yetim surecler. /T ile tum agac kapatilir.
+                & "$env:SystemRoot\system32\taskkill.exe" /PID $p.Id /T /F 2>&1 | Out-Null
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
                 Write-Host ((T 'act_timeout') -f $HiddenTimeoutSec) -ForegroundColor DarkYellow
             }
@@ -463,8 +466,14 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
     } catch {
         Write-Host ((T 'uac_cancel2') -f $Label) -ForegroundColor Yellow
     } finally {
-        Remove-Item -Path $file -ErrorAction SilentlyContinue
-        Remove-Item -Path $log -ErrorAction SilentlyContinue
+        # Surec yeni oldugunde handle'lar hemen birakilmaz; tek denemeli silme sessizce basarisiz olur
+        # ve motorun tam kopyasini iceren .cmd gecici klasorde kalir. Kisa yeniden deneme.
+        foreach ($f in @($file, $log)) {
+            for ($i = 0; $i -lt 10 -and (Test-Path $f); $i++) {
+                Remove-Item -Path $f -Force -ErrorAction SilentlyContinue
+                if (Test-Path $f) { Start-Sleep -Milliseconds 150 }
+            }
+        }
     }
 }
 

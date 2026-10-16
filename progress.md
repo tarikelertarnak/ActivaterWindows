@@ -1,5 +1,35 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.1.3: yetim surec ve gecici dosya sizintilari kapatildi
+
+Gizli calistirma sure sinirina takildiginda iki sizinti olculdu ve kapatildi.
+
+1. **Yetim surec sizintisi (gercek hata).** Zaman asiminda `Stop-Process -Id $p.Id -Force` yalnizca
+   cmd.exe'yi olduruyordu; motor ve onun `timeout`/`choice` cocuklari **gizli sekilde yasamaya devam
+   ediyordu**. Yani kullanici "islem tamamlanmamis olabilir" mesajini gorurken aktivasyon arka planda
+   surmeye devam edebiliyordu.
+   Olcum: test oncesi 6 cmd.exe → sonrasi 9 (**3 sizinti**).
+   Cozum: `taskkill /PID <id> /T /F` ile **tum agac** kapatilir.
+   Olcum (duzeltme sonrasi): PID farki **0**, `AW_` kalintisi tasiyan surec **0**.
+
+2. **Gecici dosya sizintisi.** `Remove-Item` surec yeni oldugunde handle acik oldugu icin sessizce
+   basarisiz oluyordu (`-ErrorAction SilentlyContinue`), dolayisiyla **motorun tam kopyasini iceren
+   .cmd** gecici klasorde kalabiliyordu (AV/forensik acisindan istenmeyen iz).
+   Cozum: 10 x 150 ms yeniden denemeli silme.
+
+### Dogrulama (olcumle)
+
+- Normal (hizli biten) gizli calistirma sonrasi: yeni kalinti dosya **0**, yetim surec **0**.
+- Zaman asimi sonrasi: PID farki **0** (duzeltme oncesi 3).
+- `-SelfTest` PS 5.1 + pwsh 7 **20/20 OK**; motor kademeleri A/B/C/D/E OK; AST parse 0 hata.
+
+### Bilinen kalinti (kullanicinin kapatmasi gereken)
+
+Duzeltme ONCESI yapilan testlerden kalan bazi gizli `cmd.exe /k` surecleri, `C:\WINDOWS\Temp` ve
+`%LOCALAPPDATA%\Temp` altindaki eski `AW_*.log` dosyalarini kilitli tutuyor (8 dosya, hepsi 40-66 bayt).
+Bunlar urun kusuru degil, eski surumun sizintisinin kalintisidir; yeni surum yeni kalinti uretmiyor.
+Temizlik icin ilgili `cmd.exe` surecleri kapatilip dosyalar silinebilir.
+
 ## 2026-10-16 — v2.1.2: Office kurulum yolu duzeltmeleri + yapilandirma testi
 
 Office kurulumu (Kai'nin "office ... her sey calismali" sarti) incelenirken cikan gercek hatalar:
