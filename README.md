@@ -192,7 +192,7 @@ paketlenmiş `.exe` olduğu için antivirüs heuristic'lerini tetikleyebilir. Ya
 
 ```
 ActivaterWindows/
-├── ActivaterWindows.ps1      # Terminal çekirdeği (tek dosya, ~25 KB)
+├── ActivaterWindows.ps1      # Terminal çekirdeği (tek dosya, ~44 KB)
 ├── ActivaterWindows.cmd      # Çift tık başlatıcısı
 ├── builder/                  # (legacy) v1.0 GUI exe kaynak kodu
 ├── resources/                # (legacy) ODT + MAS v3.12 gömülü kopyalar
