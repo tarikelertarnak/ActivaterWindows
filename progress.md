@@ -23,12 +23,26 @@ Gizli calistirma sure sinirina takildiginda iki sizinti olculdu ve kapatildi.
 - Zaman asimi sonrasi: PID farki **0** (duzeltme oncesi 3).
 - `-SelfTest` PS 5.1 + pwsh 7 **20/20 OK**; motor kademeleri A/B/C/D/E OK; AST parse 0 hata.
 
+### Kok neden (sonradan tespit edildi)
+
+Yetim kalan surec **cmd.exe degil `choice.exe`** idi: `choice /c 0 /n` tus beklerken cmd.exe
+olduruluyor, ama `choice.exe` cocuk surec olarak yasamaya devam ediyordu — hem gorunmez bir
+zombie olarak hem de devraldigi `AW_*.log` handle'ini tutarak (dosya bu yuzden silinemiyordu).
+Olcum: duzeltme oncesi her zaman asimi testi 1 adet yetim choice.exe birakiyordu (toplam 8 adet,
+13:17 -> 14:32). Duzeltme sonrasi: **8 -> 8, yeni yetim 0**.
+
 ### Bilinen kalinti (kullanicinin kapatmasi gereken)
 
-Duzeltme ONCESI yapilan testlerden kalan bazi gizli `cmd.exe /k` surecleri, `C:\WINDOWS\Temp` ve
-`%LOCALAPPDATA%\Temp` altindaki eski `AW_*.log` dosyalarini kilitli tutuyor (8 dosya, hepsi 40-66 bayt).
-Bunlar urun kusuru degil, eski surumun sizintisinin kalintisidir; yeni surum yeni kalinti uretmiyor.
-Temizlik icin ilgili `cmd.exe` surecleri kapatilip dosyalar silinebilir.
+Duzeltme ONCESI testlerden kalan 8 adet gizli `choice.exe` (sonsuza kadar tus bekliyor) ve
+1 adet `cmd.exe /k`, `C:\Windows\Temp` + `%LOCALAPPDATA%\Temp` altindaki eski `AW_*.log`
+dosyalarini kilitli tutuyor (40-66 bayt). Yeni surum yeni kalinti uretmiyor; kalintilar eski
+sizintinin izidir. Temizlik (kullanici tarafindan):
+
+```powershell
+taskkill /IM choice.exe /F
+Get-ChildItem "$env:SystemRoot\Temp","$env:USERPROFILE\AppData\Local\Temp" -Filter 'AW_*' -File | Remove-Item -Force
+```
+
 
 ## 2026-10-16 — v2.1.2: Office kurulum yolu duzeltmeleri + yapilandirma testi
 
