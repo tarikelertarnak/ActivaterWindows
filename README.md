@@ -8,11 +8,12 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-2.1-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/size-%7E41KB-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-2.1.3-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/size-%7E44KB-success?style=flat-square" />
   <img src="https://img.shields.io/badge/engine-auto--tracked%20%2B%20SHA256-red?style=flat-square" />
   <img src="https://img.shields.io/badge/deps-none%20required-lightgrey?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
+  <a href="https://github.com/tarikelertarnak/ActivaterWindows/releases/latest"><img src="https://img.shields.io/github/v/release/tarikelertarnak/ActivaterWindows?style=flat-square&label=release" /></a>
 </p>
 
 ---
@@ -23,7 +24,7 @@ v1.0 tek bir PyInstaller `.exe` idi (19 MB). v2.0 altyapı sıfırdan değişti:
 
 | | v1.0 (exe) | v2.0 (terminal) |
 |---|---|---|
-| Boyut | 19 MB PE dosyası | **~25 KB** düz metin |
+| Boyut | 19 MB PE dosyası | **~44 KB** düz metin |
 | Antivirus algılama | Yüksek (paketlenmiş exe + lisans API çağrıları = klasik heuristic tuzağı) | **Çok düşük** (paketleme yok, imzalı uzak kaynak + SHA256 doğrulama, her satır okunabilir) |
 | Başlatma hızı | PyInstaller unpacking | Anında |
 | MAS özellikleri | Gömülü, sürüm donmuş (v3.12) | Otomatik izlenen upstream + 2 yedek kademe — **tüm özellikler** (Troubleshoot, sürüm değiştirme, $OEM$ dahil) |
@@ -168,9 +169,14 @@ Motor üç kademeli olarak çözülür. İlk iki kademe **bilinen SHA256** ile d
 
 ---
 
-## Eski Sürüm (GUI exe)
+## Eski Sürüm (GUI exe — arşiv)
 
-v1.0 Tkinter GUI'si (`builder/`, `resources/`)legacy olarak korunur: [Releases](https://github.com/tarikelertarnak/ActivaterWindows/releases) sayfasından `ActivaterWindows.exe` indirilebilir. Yeni geliştirme terminal sürümündedir.
+v1.0 Tkinter GUI'si (`builder/`, `resources/`) legacy olarak korunur ama **artık geliştirilmiyor** ve
+paketlenmiş `.exe` olduğu için antivirüs heuristic'lerini tetikleyebilir. Yalnızca tarihsel arşivdir:
+[v1.0.0 (arşiv)](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v1.0.0).
+
+**Kullanman gereken sürüm:** [v2.1.3 — Terminal Edition](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v2.1.3)
+(yukarıdaki tek satır). `ActivaterWindows.exe` indirmene gerek yok.
 
 ---
 
