@@ -39,9 +39,8 @@ $Strings = @{
         m3 = '  [3] Windows + ESU + Office     - TSforge (kalici)'
         m4 = '  [4] Windows 10 ESU             - TSforge (kalici)'
         m5 = '  [5] Aktivasyon durumu - kontrol et'
-        m6 = '  [6] TAM MAS MENUSU - tum ozellikler (Troubleshoot, Surum degistir, $OEM$...)'
-        m7 = '  [7] Office LTSC Pro Plus 2024 kur (+Ohook)'
-        m8 = '  [8] HEPSINI YAP - Windows + Office + Office kurulumu, tek tik'
+        m6 = '  [6] Office LTSC Pro Plus 2024 kur (dil + bilesen secimi)'
+        m7 = '  [7] HEPSINI ETKINLESTIR - Office kur + Windows/ESU/Office kalici + tam MAS menusu'
         mx = '  [0] Cikis'
         ml = '  [L] Arayuz dilini degistir'
         choice = 'Secim'
@@ -83,6 +82,8 @@ $Strings = @{
         all_start = 'HEPSINI YAP: ofis kurulu degilse kurulacak, sonra Windows + ESU + Office TSforge ile kalici etkinlestirilecek, en son durum raporu...'
         all_nooffice = 'Office kurulu gorunmuyor. LTSC 2024 kurulsun mu? (E/h, bos = evet)'
         all_installing = 'Once Office kuruluyor...'
+        all_masmenu = 'Tam MAS menusu de acilsin mi? (Troubleshoot, surum degistir, $OEM$...) (E/h)'
+        all_done = 'Hepsini etkinlestirme turu bitti.'
         ohook_ask = 'Office simdi Ohook ile etkinlestirilsin mi? (E/h)'
     }
     en = @{
@@ -92,9 +93,8 @@ $Strings = @{
         m3 = '  [3] Windows + ESU + Office  - TSforge (permanent)'
         m4 = '  [4] Windows 10 ESU          - TSforge (permanent)'
         m5 = '  [5] Check activation status'
-        m6 = '  [6] FULL MAS MENU - all features (Troubleshoot, Change Edition, $OEM$...)'
-        m7 = '  [7] Install Office LTSC Pro Plus 2024 (+Ohook)'
-        m8 = '  [8] DO EVERYTHING - Windows + Office + Office install, one go'
+        m6 = '  [6] Install Office LTSC Pro Plus 2024 (language + component picker)'
+        m7 = '  [7] ACTIVATE EVERYTHING - install Office + Windows/ESU/Office permanent + full MAS menu'
         mx = '  [0] Exit'
         ml = '  [L] Change interface language'
         choice = 'Choice'
@@ -136,6 +136,8 @@ $Strings = @{
         all_start = 'DO EVERYTHING: install Office if missing, then activate Windows + ESU + Office permanently via TSforge, then status report...'
         all_nooffice = 'Office does not seem installed. Install LTSC 2024? (Y/n, blank = yes)'
         all_installing = 'Installing Office first...'
+        all_masmenu = 'Also open the full MAS menu? (Troubleshoot, change edition, $OEM$...) (Y/n)'
+        all_done = 'Activate-everything run finished.'
         ohook_ask = 'Activate Office with Ohook now? (Y/n)'
     }
 }
@@ -502,6 +504,11 @@ function Invoke-AllInOne {
     # TSforge: Windows + ESU + Office hepsi tek geciste, kalici
     Invoke-MasAio '/Z-WindowsESUOffice'
     Invoke-MasCheck
+    # entegre: tam MAS menusu (Troubleshoot, surum degistir, $OEM$...) — hepsi bu akisin icinden
+    $ask = if ((Get-UiLang) -eq 'tr') { '^[HhYy]|^$' } else { '^[Yy]|^$' }
+    $m = Read-Host (T 'all_masmenu')
+    if ($m -match $ask) { Invoke-MasAio }
+    Write-Host (T 'all_done') -ForegroundColor Green
 }
 
 function Set-UiLang {
@@ -526,9 +533,8 @@ function Show-Menu {
     Write-Host (T 'm3') -ForegroundColor White
     Write-Host (T 'm4') -ForegroundColor White
     Write-Host (T 'm5') -ForegroundColor White
-    Write-Host (T 'm6') -ForegroundColor Yellow
-    Write-Host (T 'm7') -ForegroundColor Cyan
-    Write-Host (T 'm8') -ForegroundColor Magenta
+    Write-Host (T 'm6') -ForegroundColor Cyan
+    Write-Host (T 'm7') -ForegroundColor Magenta
     Write-Host (T 'mx') -ForegroundColor DarkGray
     Write-Host (T 'ml') -ForegroundColor DarkGray
     Write-Host ''
@@ -539,9 +545,8 @@ function Show-Menu {
         '3' { Invoke-MasAio '/Z-WindowsESUOffice' }
         '4' { Invoke-MasAio '/Z-ESU' }
         '5' { Invoke-MasCheck }
-        '6' { Invoke-MasAio }
-        '7' { Install-OfficeLTSC }
-        '8' { Invoke-AllInOne }
+        '6' { Install-OfficeLTSC }
+        '7' { Invoke-AllInOne }
         '0' { return $true }
         'l' { Set-UiLang }
         'L' { Set-UiLang }

@@ -1,5 +1,22 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.0.5: Tam MAS menusu [7] icine entegre edildi, menu sadelesti
+
+### Degisiklikler
+- **TAM MAS MENUSU ayri satir olarak KALDIRILDI** (eski [6]).
+- **[7] HEPSINI ETKINLESTIR** (eski [8] HEPSINI YAP): tek tikli tam akis —
+  Office kurulu degilse sorar/kurar (dil + bilesen secimi) → `TSforge /Z-WindowsESUOffice`
+  (Windows + ESU + Office, kalici) → durum raporu → **sonda tam MAS menusu teklifi**
+  (Troubleshoot, surum degistir, $OEM$ — hepsi bu akisin icinden). Boylece eski [6] ozelligi
+  kaybolmadi, [7]'ye entegre oldu.
+- Menu: [1-4] aktivasyon, [5] durum, [6] Office kur, [7] HEPSINI ETKINLESTIR, [0], [L].
+- Yeni string'ler: `all_masmenu`, `all_done` (TR/EN). Eski `m8` anahtari silindi.
+
+### Dogrulama
+- Parse: `PARSE OK`.
+- i18n: `KEYS OK: 52 anahtar x 2 dil`, `I18N TEST OK`.
+- Menu render (TR+EN): 7 satir dogru, m8 kalmadi, `MENU RENDER OK`.
+
 ## 2026-10-16 — v2.0.4: Office bilesen secimi (Ozel Secim), renkli arayuz
 
 ### Degisiklikler
