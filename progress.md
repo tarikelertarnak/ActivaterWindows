@@ -425,3 +425,21 @@ Onceki turun incelemesinde cikan ve **olcumle dogrulanan** iki gercek hata gider
 
 ## 2026-09-21 — (önceki) v3.0.0: ActivatePro rename + embedded MAS activation tab
 - (Eski kayıt — ActivatePro adıyla yapılmıştı, ActivaterWindows'a evrildi. Detaylar: commit dcaaf5c + eski progress.md arşivi.)
+
+## 2026-10-16 — v2.5.0: pure-ASCII fix + TARIK ELER + edition picker redesign
+
+- **Kök neden düzeltildi (mojibake `TarÄ±k Eler`)**: GitHub Pages `.ps1` dosyasını `application/octet-stream` olarak sunuyor; `irm` bunu Latin1 kodlayıp çözüyor → UTF-8 `ı` (U+0131) `Ä±` oluyordu.
+- **Çözüm**: dosya 100% ASCII'ye çekildi (72769 B). 9 em-dash (U+2014) ASCII `-` ile değiştirildi. Kodlama-agnostik olduğu için hiçbir decode yolu bozamaz. BOM yok, LF-only korundu.
+- **Author**: `$Author` + TR/EN dict `author` anahtarları + README → `TARIK ELER` (ASCII, büyük harf).
+- **Edition picker yeniden tasarlandı** (`Get-EditionInfo` + `Invoke-ChangeEdition`):
+  - Teknik Edition ID → friendly ad + kısa amaç (ör. `Professional` → "Windows 11 Pro — Gelismis yonetim, BitLocker, Hyper-V (yazilimcilar, ileri kullanicilar)").
+  - Mevcut sürüm `[x]` işareti + "(oneri - su anki surum)" ile işaretleniyor, ilk sırada.
+  - Sayfalama: sayfa başına 9 sürüm, fazlası için "10) Digere bak"; her sayfada "0) Geri".
+  - Motorun kendi `Change_Windows_Edition.cmd`'ine delegasyon (aynı commit'e sabit) korundu.
+- **Doğrulama**:
+  - Parse OK (pwsh 7). SelfTest `SELFTEST OK` — PowerShell 5.1 + pwsh 7.
+  - Non-ASCII tarama: 0 bayt >127. `Tar`/`Eler` bağıntısı: 0.
+  - Canlı: `https://tarikelertarnak.github.io/aw.ps1` HTTP 200, 72769 B, non-ASCII 0, `TARIK ELER` var, `$Version = '2.5.0'` var. `irm` kabul testi **PASS**.
+- **Dağıtım**: repo `main` → e329b48. gh-pages `aw.ps1` → b2f6c61. Release `v2.5.0` asset'i yenilendi (ActivaterWindows.ps1 72769 B).
+- **Bilinen sınır**: `gh` token repo metadata (description/topics/homepage) için 403 döndürüyor — GitHub web UI'dan elle ayarlanmalı.
+- **Not**: `builder/office_setup_wizard.py` (Kai'nin işi) commit'e dahil edilmedi, yerelde bırakıldı.
