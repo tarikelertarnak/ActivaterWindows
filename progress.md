@@ -1,5 +1,46 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.2.0: ozel secim varsayilani + uc yerde ilerleme cubugu + arayuz duzeni
+
+Kai bildirdi: (1) ozel secimde 3 bilesen secili geliyordu (yanlis), (2) ODT ayiklama ve Office
+kurulumu sirasinda sadece yazi gorunuyor, cubuk yok, (3) renk/duzen/siralama iyilestirilmeli.
+
+### Degisiklikler
+
+1. **Varsayilan secim artik bos.** `New-AppSelection` eklendi (hepsi `$false`) ve
+   `Select-OfficeApps` onu kullaniyor. `r` kisayolu hala onerilen seti (Word, Excel, PowerPoint)
+   isaretler — ama yalnizca kullanici isterse. Regresyon testi: `office secim: varsayilan bos`.
+
+2. **Ilk yerde duran metin hatasi:** `mode_h` "Word, Excel, PowerPoint, OneDrive **disi** bilesenler
+   kurulmaz" diyordu; EN karsiligi ise "all components except Word, Excel, PowerPoint, OneDrive"
+   idi. Ikisi de gercek davranisi ters anlatiyordu (kod Access/Lync/OneDrive/OneNote/Outlook/Publisher
+   haric tutuyor, yani **sadece** W/E/P kuruluyor). Ikisi de duzeltildi + `-SelfTest` artik metnin
+   W/E/P dedigini dogruluyor.
+
+3. **Uc sessiz adima ilerleme cubugu geldi.** `Write-BusyBar` (kayan cubuk + gecen sure) ve
+   `Wait-WithBar` (kosul saglanana kadar canli tutar, `MaxSec` ile zaman asimi) eklendi.
+   - ODT ayiklama (`/extract`) → 300 sn sinir
+   - Office kurulumu (`setup.exe /configure`) → 3600 sn sinir, yonetici ve UAC yollarinda da
+   - **Gizli etkinlestirme** → eskiden `$p.WaitForExit(...)` ile tamamen sessiz bekliyordu
+   Indirme gibi toplami bilinen isler eski gercek yuzde cubugunu (`Write-DlBar`) kullanmaya devam ediyor.
+
+4. **Arayuz:** ozel secim ekrani cerceveli baslik + sagda canli sayac (`Secili: 0 / 9`), hizalanmis
+   kolonlar, onerilenler icin `oneri` etiketi, onaydan sonra kurulacaklarin adlari listeleniyor
+   (`app_chosen`). Kurulum akisinda **dil once, mod sonra** secilir (dil yapilandirmanin parcasi);
+   mod listesi hizalandi ve basligi (`mode_head`) eklendi.
+
+### Dogrulama (olcumle)
+
+- `-SelfTest` PS 5.1 + pwsh 7 → **26/26 OK** (5 yeni kontrol: varsayilan bos, 9 bilesen, mode metni,
+  ipucu metni, cubuk davranisi).
+- Cubuk davranisi olculdu: `Wait-WithBar { $true }` hemen doner; `Wait-WithBar { $false } 1` ~1 sn'de
+  durur ve `$false` doner (ekranda `[#---]` → `[-#--]` kaymasi goruldu).
+- Ozel secim ekrani 5 farkli durumda render edildi (bos / hepsi / 1-3-5 / onerilen / EN) → hizalama
+  ve sayac dogru, varsayilan `Secili: 0 / 9`.
+- Gizli etkinlestirme regresyonu: zaman asimi testinde cubuk gorunuyor (`[####...] 4s`), surec agaci
+  kapatiliyor, kalan cmd **0**, yeni yetim `choice.exe` **0** (8 → 8).
+- Motor kademeleri A/B/C/D/E OK; AST parse 0 hata.
+
 ## 2026-10-16 — v2.1.3: yetim surec ve gecici dosya sizintilari kapatildi
 
 Gizli calistirma sure sinirina takildiginda iki sizinti olculdu ve kapatildi.

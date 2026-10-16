@@ -56,20 +56,24 @@ $Strings = @{
         choice = 'Secim'
         back = 'Menuye donmek icin Enter'
         sel12 = 'Secim (1/2/3)'
+        mode_head = 'Kurulum modu:'
         langpick = 'Dil:  [1] Otomatik (su an: {0})  [2] Turkce  [3] English'
         olang = 'Office dili: kod yaz (ornek: tr-tr) veya asagidaki listeden numara sec [otomatik: {0}]'
         olang_confirm = '{0}) {1} — onayliyor musun? Enter = evet, 0 = geri'
         lang_head = 'Office dilleri (alfabetik):'
-        mode_h = '  [1] Onerilen (hafif): Word, Excel, PowerPoint, OneDrive disi bilesenler kurulmaz'
-        mode_t = '  [2] Tam paket: tum bilesenler'
-        mode_c = '  [3] Ozel Secim : hangi bilesenin kurulacagini kendin sec'
-        app_head = '--- Ozel Secim / Custom Selection ---'
-        app_hint = 'Ac/Kapa: numaralari virgulle yaz (ornek: 1,3,5)  |  a = tumu   n = hicbiri   r = onerilen   Enter = onayla'
+        mode_h = '  [1] Onerilen (hafif) : sadece Word, Excel, PowerPoint kurulur'
+        mode_t = '  [2] Tam paket         : tum bilesenler kurulur'
+        mode_c = '  [3] Ozel Secim        : hangi bilesenin kurulacagini kendin sec'
+        app_head = 'OZEL SECIM / CUSTOM SELECTION'
+        app_hint = 'Ac/Kapa: numaralari virgul ile yaz (ornek: 1,3,5)   |   a = tumu   n = hicbiri   r = onerilen (Word, Excel, PowerPoint)   Enter = onayla'
+        app_count = 'Secili: {0} / {1}'
+        app_rec = 'oneri'
         app_sel = 'Secim'
         app_install = 'kurulacak'
         app_skip = 'atlanacak'
         app_none = 'Hicbir bilesen secilmedi, en az birini sec!'
         app_done = 'Ozel secim: {0} bilesen kurulacak, {1} bilesen atlanacak.'
+        app_chosen = 'Kurulacak: {0}'
         invalid_lang = 'Gecersiz dil kodu veya numara.'
         odt_local = 'ODT yerel kopyadan aliniyor: {0}'
         odt_dl = 'Office Deployment Tool indiriliyor (microsoft.com)...'
@@ -81,6 +85,7 @@ $Strings = @{
         inst_uac = 'Office kuruluyor (UAC izni gerekecek)...'
         inst_done = 'Kurulum bitti (cikis kodu: {0}).'
         inst_fail = 'Office kurulumu TAMAMLANMADI (cikis kodu: {0}). Ayrintili log: %TEMP%\OfficeSetup*.log'
+        step_timeout = 'Bu adim beklenenden uzun surdu ve durduruldu. Islem tamamlanmamis olabilir.'
         uac_cancel = 'Kurulum iptal edildi (UAC reddedildi).'
         done = '{0} tamamlandi (cikis kodu: {1}).'
         uac_cancel2 = '{0} iptal edildi (UAC reddedildi).'
@@ -119,20 +124,24 @@ $Strings = @{
         choice = 'Choice'
         back = 'Press Enter to return to menu'
         sel12 = 'Choice (1/2/3)'
+        mode_head = 'Install mode:'
         langpick = 'Language:  [1] Automatic (now: {0})  [2] Turkce  [3] English'
         olang = 'Office language: type a code (e.g. tr-tr) or pick a number from the list below [auto: {0}]'
         olang_confirm = '{0}) {1} — confirm? Enter = yes, 0 = back'
         lang_head = 'Office languages (alphabetical):'
-        mode_h = '  [1] Recommended (light): all components except Word, Excel, PowerPoint, OneDrive'
-        mode_t = '  [2] Full: all components'
-        mode_c = '  [3] Custom : choose exactly which components install'
-        app_head = '--- Custom Selection ---'
-        app_hint = 'Toggle: type numbers separated by commas (e.g. 1,3,5)  |  a = all   n = none   r = recommended   Enter = confirm'
+        mode_h = '  [1] Recommended (light) : only Word, Excel, PowerPoint install'
+        mode_t = '  [2] Full                : every component installs'
+        mode_c = '  [3] Custom              : choose exactly which components install'
+        app_head = 'CUSTOM SELECTION'
+        app_hint = 'Toggle: type numbers separated by commas (e.g. 1,3,5)   |   a = all   n = none   r = recommended (Word, Excel, PowerPoint)   Enter = confirm'
+        app_count = 'Selected: {0} / {1}'
+        app_rec = 'rec.'
         app_sel = 'Choice'
         app_install = 'install'
         app_skip = 'skip'
         app_none = 'No component selected, pick at least one!'
         app_done = 'Custom: {0} components will install, {1} will be skipped.'
+        app_chosen = 'Installing: {0}'
         invalid_lang = 'Invalid language code or number.'
         odt_local = 'Using local ODT copy: {0}'
         odt_dl = 'Downloading Office Deployment Tool (microsoft.com)...'
@@ -144,6 +153,7 @@ $Strings = @{
         inst_uac = 'Installing Office (UAC prompt will appear)...'
         inst_done = 'Install finished (exit code: {0}).'
         inst_fail = 'Office install did NOT complete (exit code: {0}). Details: %TEMP%\OfficeSetup*.log'
+        step_timeout = 'This step took longer than expected and was stopped. The operation may be incomplete.'
         uac_cancel = 'Install cancelled (UAC declined).'
         done = '{0} finished (exit code: {1}).'
         uac_cancel2 = '{0} cancelled (UAC declined).'
@@ -239,6 +249,33 @@ function Write-DlBar([long]$Done, [long]$Total, $Sw) {
     $track = ('#' * $bars) + ('-' * (30 - $bars))
     $el = if ($Sw) { [int]$Sw.Elapsed.TotalSeconds } else { 0 }
     Write-Host ("`r  [{0}] {1,3}%  {2,3}s" -f $track, $pct, $el) -NoNewline
+}
+
+# Yuzdesi bilinmeyen ama uzun suren adimlar (ODT ayiklama, Office kurulumu) icin kayan cubuk.
+# Indirme gibi toplami bilinen isler Write-DlBar'in gercek yuzdesini kullanir; bu onun tamamlayicisi.
+function Write-BusyBar([int]$Tick, [int]$Width = 30, $Sw) {
+    $pos = $Tick % ($Width * 2)
+    if ($pos -ge $Width) { $pos = ($Width * 2) - $pos - 1 }
+    $track = ('-' * $pos) + '#' + ('-' * ($Width - $pos - 1))
+    $el = if ($Sw) { [int]$Sw.Elapsed.TotalSeconds } else { 0 }
+    Write-Host ("`r  [{0}] {1,4}s" -f $track, $el) -NoNewline
+}
+
+# Kosul saglanana kadar cubugu canli tutar. $MaxSec asilirsa durur ve $false doner (sonsuz asilma yok).
+function Wait-WithBar([scriptblock]$IsDone, [int]$MaxSec = 1800) {
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $tick = 0
+    $fin = $false
+    while (-not $fin -and $sw.Elapsed.TotalSeconds -lt $MaxSec) {
+        try { $fin = [bool](& $IsDone) } catch { $fin = $true }
+        if ($fin) { break }
+        Write-BusyBar $tick 30 $sw
+        $tick++
+        Start-Sleep -Milliseconds 100
+    }
+    $sw.Stop()
+    Write-Host ("`r  [{0}] {1,4}s" -f ('#' * 30), [int]$sw.Elapsed.TotalSeconds)
+    $fin
 }
 
 function Invoke-Download([string]$Url, [string]$OutFile) {
@@ -447,8 +484,9 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
             # Motor bazi akislarda sonda tus bekler (or. durum kontrolu `choice /c 0 /n`).
             # Gizli pencerede tus bekleyen surec sonsuza kadar asili kalir; bu yuzden sinirli bekle:
             # cikti zaten gecici gunluge yazilmis olur, sonra surec sonlandirilir.
+            # Motorun kendi penceresi gizli oldugu icin tek geri bildirim bu cubuktur.
             $p = Start-Process @sp
-            if (-not $p.WaitForExit($HiddenTimeoutSec * 1000)) {
+            if (-not (Wait-WithBar { $p.WaitForExit(200) } $HiddenTimeoutSec)) {
                 # Stop-Process yalnizca cmd.exe'yi oldurur; motor (ve onun timeout/choice cocuklari)
                 # yasamaya devam eder -> gizli yetim surecler. /T ile tum agac kapatilir.
                 & "$env:SystemRoot\system32\taskkill.exe" /PID $p.Id /T /F 2>&1 | Out-Null
@@ -521,25 +559,41 @@ function Default-OfficeLang {
     else { $c }
 }
 
+# Hicbir bilesen onceden secili gelmez; kullanici kendi secer.
+function New-AppSelection {
+    $sel = @{}
+    foreach ($a in $OfficeApps) { $sel[$a.id] = $false }
+    $sel
+}
+
 function Show-AppPicker($sel) {
+    $count = @($OfficeApps | Where-Object { $sel[$_.id] }).Count
+    $head = T 'app_head'
+    $cnt  = (T 'app_count') -f $count, $OfficeApps.Count
+    $pad  = 58 - $head.Length - $cnt.Length
+    if ($pad -lt 2) { $pad = 2 }
     Write-Host ''
-    Write-Host (T 'app_head') -ForegroundColor Cyan
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
+    Write-Host ('   ' + $head) -ForegroundColor Cyan -NoNewline
+    Write-Host ((' ' * $pad) + $cnt) -ForegroundColor Yellow
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     for ($i = 0; $i -lt $OfficeApps.Count; $i++) {
         $a = $OfficeApps[$i]
-        $on = [bool]$sel[$a.id]
-        $mark = if ($on) { '[X]' } else { '[ ]' }
-        $col = if ($on) { 'Green' } else { 'DarkGray' }
-        Write-Host ("   {0,2}) " -f ($i + 1)) -ForegroundColor Cyan -NoNewline
-        Write-Host ("{0} " -f $mark) -ForegroundColor $col -NoNewline
-        Write-Host $a.n -ForegroundColor $col
+        $isOn = [bool]$sel[$a.id]
+        $mark = if ($isOn) { '[x]' } else { '[ ]' }
+        $col = if ($isOn) { 'Green' } else { 'DarkGray' }
+        Write-Host ('   {0,2}) ' -f ($i + 1)) -ForegroundColor Cyan -NoNewline
+        Write-Host ('{0} ' -f $mark) -ForegroundColor $col -NoNewline
+        Write-Host ('{0,-19}' -f $a.n) -ForegroundColor $col -NoNewline
+        if ($OfficeAppsRecommended -contains $a.id) { Write-Host (T 'app_rec') -ForegroundColor DarkCyan } else { Write-Host '' }
     }
     Write-Host ''
-    Write-Host (T 'app_hint') -ForegroundColor DarkYellow
+    Write-Host ('  ' + (T 'app_hint')) -ForegroundColor DarkYellow
+    Write-Host ''
 }
 
 function Select-OfficeApps {
-    $sel = @{}
-    foreach ($a in $OfficeApps) { $sel[$a.id] = ($OfficeAppsRecommended -contains $a.id) }
+    $sel = New-AppSelection
     while ($true) {
         Show-AppPicker $sel
         $in = Read-Host (T 'app_sel')
@@ -562,6 +616,7 @@ function Select-OfficeApps {
     $chosen = @($OfficeApps | Where-Object { $sel[$_.id] })
     if ($chosen.Count -eq 0) { Write-Host (T 'app_none') -ForegroundColor Red; return (Select-OfficeApps) }
     Write-Host ((T 'app_done') -f $chosen.Count, ($OfficeApps.Count - $chosen.Count)) -ForegroundColor Green
+    Write-Host ((T 'app_chosen') -f (($chosen | ForEach-Object { $_.n }) -join ', ')) -ForegroundColor DarkGreen
     $chosen
 }
 
@@ -626,12 +681,18 @@ function Get-OfficeConfigXml {
 function Install-OfficeLTSC {
     param([switch]$SkipActivate)
     Write-Host ''
-    Write-Host '--- Office LTSC Professional Plus 2024 ---' -ForegroundColor Cyan
-    Write-Host (T 'mode_h') -ForegroundColor White
-    Write-Host (T 'mode_t') -ForegroundColor White
-    Write-Host (T 'mode_c') -ForegroundColor Cyan
-    $mode = Read-Host (T 'sel12')
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
+    Write-Host '   Office LTSC Professional Plus 2024' -ForegroundColor Cyan
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
+    # Dil once, mod sonra: dil yapilandirmanin parcasi, kurulum kapsamindan bagimsiz secilir.
     $lang = Resolve-OfficeLang
+    Write-Host ''
+    Write-Host ('  ' + (T 'mode_head')) -ForegroundColor Yellow
+    Write-Host (T 'mode_h') -ForegroundColor Gray
+    Write-Host (T 'mode_t') -ForegroundColor Gray
+    Write-Host (T 'mode_c') -ForegroundColor Gray
+    Write-Host ''
+    $mode = Read-Host (T 'sel12')
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
     New-Item -ItemType Directory -Path $work -Force | Out-Null
@@ -673,8 +734,9 @@ function Install-OfficeLTSC {
         $excludeIds = @('Access', 'Lync', 'OneDrive', 'OneNote', 'Outlook', 'Publisher')
     }
 
-    Write-Host (T 'extract') -ForegroundColor DarkGray
-    Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait -WindowStyle Hidden
+    Write-Host (T 'extract') -ForegroundColor Cyan
+    $px = Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -PassThru -WindowStyle Hidden
+    if (-not (Wait-WithBar { $px.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
     $setup = Join-Path $work 'setup.exe'
     if (-not (Test-Path $setup)) { Write-Host (T 'extract_fail') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
@@ -687,14 +749,16 @@ function Install-OfficeLTSC {
     $rc = $null
     try {
         if ($isAdmin) {
-            Write-Host (T 'inst_start') -ForegroundColor DarkGray
-            $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$configPath`"" -Wait -PassThru -WindowStyle Hidden
+            Write-Host (T 'inst_start') -ForegroundColor Cyan
+            $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$configPath`"" -PassThru -WindowStyle Hidden
+            if (-not (Wait-WithBar { $p.HasExited } 3600)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
             $rc = $p.ExitCode
         } else {
             # Yukseletilen cocuk surec kendi cikis kodunu yazar. Aksi halde kurulum basarisiz olsa bile
-            # 'basarili' gorunurdu (eski hata).
-            Write-Host (T 'inst_uac') -ForegroundColor DarkGray
-            Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII"
+            # 'basarili' gorunurdu (eski hata). Cubuk, cikis kodu dosyasi olusana kadar canli kalir.
+            Write-Host (T 'inst_uac') -ForegroundColor Cyan
+            $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII"
+            if (-not (Wait-WithBar { (Test-Path $rcFile) -or $p.HasExited } 3600)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
             if (Test-Path $rcFile) {
                 $rcTxt = (Get-Content -LiteralPath $rcFile -Raw).Trim()
                 if ($rcTxt -match '^-?\d+$') { $rc = [int]$rcTxt }
@@ -862,6 +926,20 @@ if ($args -contains '-SelfTest') {
         Assert 'office cfg: otomatik etkinlestirme' (@($cfgXml.Configuration.Property | Where-Object { $_.Name -eq 'AUTOACTIVATE' }).Value -eq '1')
     }
     Assert 'office cfg: hic dislama yoksa bos' (-not (Test-Match (Get-OfficeConfigXml '' @()) 'ExcludeApp'))
+
+    # Bilesen secimi: hicbiri onceden secili gelmemeli (regresyon: eskiden Word/Excel/PowerPoint secili geliyordu)
+    $dsel = New-AppSelection
+    Assert 'office secim: varsayilan bos' (@($dsel.Values | Where-Object { $_ }).Count -eq 0)
+    Assert 'office secim: 9 bilesen'     ($dsel.Keys.Count -eq 9)
+    Assert 'office mod metni W/E/P der'  (Test-Match (T 'mode_h') 'Word.*Excel.*PowerPoint')
+    Assert 'office ipucu onerilen seti'  (Test-Match (T 'app_hint') 'Word.*Excel.*PowerPoint')
+
+    # Yuzdesiz adimlar icin canli cubuk: biteni hemen gecmeli, bitmeyeni zaman asiminda kesmeli
+    Assert 'busy bar: biteni bekler'        (Wait-WithBar { $true } 5)
+    $swBar = [Diagnostics.Stopwatch]::StartNew()
+    $barRes = Wait-WithBar { $false } 1
+    $swBar.Stop()
+    Assert 'busy bar: zaman asiminda durur' ((-not $barRes) -and $swBar.Elapsed.TotalSeconds -lt 6)
 
     # TR/EN anahtar paritesi
     $tk = @($Strings['tr'].Keys); $ek = @($Strings['en'].Keys)

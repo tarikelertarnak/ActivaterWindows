@@ -8,8 +8,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-2.1.3-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/size-%7E44KB-success?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-2.2.0-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/size-%7E48KB-success?style=flat-square" />
   <img src="https://img.shields.io/badge/engine-auto--tracked%20%2B%20SHA256-red?style=flat-square" />
   <img src="https://img.shields.io/badge/deps-none%20required-lightgrey?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
@@ -24,7 +24,7 @@ v1.0 tek bir PyInstaller `.exe` idi (19 MB). v2.0 altyapı sıfırdan değişti:
 
 | | v1.0 (exe) | v2.0 (terminal) |
 |---|---|---|
-| Boyut | 19 MB PE dosyası | **~44 KB** düz metin |
+| Boyut | 19 MB PE dosyası | **~48 KB** düz metin |
 | Antivirus algılama | Yüksek (paketlenmiş exe + lisans API çağrıları = klasik heuristic tuzağı) | **Çok düşük** (paketleme yok, imzalı uzak kaynak + SHA256 doğrulama, her satır okunabilir) |
 | Başlatma hızı | PyInstaller unpacking | Anında |
 | MAS özellikleri | Gömülü, sürüm donmuş (v3.12) | Otomatik izlenen upstream + 2 yedek kademe — **tüm özellikler** (Troubleshoot, sürüm değiştirme, $OEM$ dahil) |
@@ -120,22 +120,47 @@ Kurulumda 83 Office dil kodu **alfabetik numaralı liste** halinde gösterilir:
 
 | Mod | Ne kurar |
 |---|---|
-| **1 — Önerilen (hafif)** | Word, Excel, PowerPoint (Access, Outlook, Publisher, OneNote, OneDrive, Skype hariç) |
+| **1 — Önerilen (hafif)** | Sadece Word, Excel, PowerPoint (diğer 6 bileşen kurulmaz) |
 | **2 — Tam paket** | Tüm bileşenler |
 | **3 — Özel Seçim** | 9 bileşeni tek tek işaretle |
 
-Özel Seçim renkli işaret-kaldır listesi sunar:
+Özel Seçim **hiçbiri seçili olmadan** açılır — ne kurmak istediğine sen karar verirsin.
+Üstte canlı sayaç, yanında önerilen işareti bulunur:
 
 ```
-  1) [X] Word          4) [ ] Outlook         7) [ ] OneNote
-  2) [X] Excel         5) [ ] Access          8) [ ] OneDrive
-  3) [X] PowerPoint    6) [ ] Publisher       9) [ ] Skype for Business
+  ==========================================================
+   OZEL SECIM / CUSTOM SELECTION                Secili: 0 / 9
+  ==========================================================
+    1) [ ] Word               oneri
+    2) [ ] Excel              oneri
+    3) [ ] PowerPoint         oneri
+    4) [ ] Outlook
+    5) [ ] Access
+    6) [ ] Publisher
+    7) [ ] OneNote
+    8) [ ] OneDrive
+    9) [ ] Skype for Business
+
+  Ac/Kapa: numaralari virgul ile yaz (ornek: 1,3,5)   |   a = tumu   n = hicbiri   r = onerilen (Word, Excel, PowerPoint)   Enter = onayla
 ```
 
 - Numaraları virgülle yaz, aç/kapa: `1,3,5`
-- `a` = tümü · `n` = hiçbiri · `r` = önerilen · **Enter** = onayla
+- `a` = tümü · `n` = hiçbiri · `r` = önerilen (Word, Excel, PowerPoint) · **Enter** = onayla
 - Yeşil = kurulacak, gri = atlanacak. En az bir bileşen şart.
+- Onaydan sonra **kurulacak bileşenlerin adları** da yazılır (ör. `Kurulacak: Word, Excel, PowerPoint`).
 
+### İlerleme çubukları
+
+Yüzdesi bilinen işlerde (indirme) **gerçek yüzde**, bilinmeyen uzun adımlarda ise **kayan çubuk + geçen süre** gösterilir:
+
+```
+  [############------------------]  40%    3s     <- indirme (gercek yuzde)
+  [-----------#-----------------]    7s            <- ODT ayiklama / Office kurulumu / etkinlestirme
+```
+
+Bu çubuk üç yerde çalışır: **ODT ayıklama**, **Office kurulumu** (`setup.exe /configure`) ve
+**gizli etkinleştirme**. Üçü de penceresiz çalıştığı için tek geri bildirim bu çubuktur — eskiden
+sadece bir satır yazı görünüp ekran donuyordu.
 
 ### İndirme göstergesi
 
@@ -175,7 +200,7 @@ v1.0 Tkinter GUI'si (`builder/`, `resources/`) legacy olarak korunur ama **artı
 paketlenmiş `.exe` olduğu için antivirüs heuristic'lerini tetikleyebilir. Yalnızca tarihsel arşivdir:
 [v1.0.0 (arşiv)](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v1.0.0).
 
-**Kullanman gereken sürüm:** [v2.1.3 — Terminal Edition](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v2.1.3)
+**Kullanman gereken sürüm:** [v2.2.0 — Terminal Edition](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v2.2.0)
 (yukarıdaki tek satır). `ActivaterWindows.exe` indirmene gerek yok.
 
 ---
@@ -192,7 +217,7 @@ paketlenmiş `.exe` olduğu için antivirüs heuristic'lerini tetikleyebilir. Ya
 
 ```
 ActivaterWindows/
-├── ActivaterWindows.ps1      # Terminal çekirdeği (tek dosya, ~44 KB)
+├── ActivaterWindows.ps1      # Terminal çekirdeği (tek dosya, ~48 KB)
 ├── ActivaterWindows.cmd      # Çift tık başlatıcısı
 ├── builder/                  # (legacy) v1.0 GUI exe kaynak kodu
 ├── resources/                # (legacy) ODT + MAS v3.12 gömülü kopyalar
