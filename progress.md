@@ -1,5 +1,34 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.1.2: Office kurulum yolu duzeltmeleri + yapilandirma testi
+
+Office kurulumu (Kai'nin "office ... her sey calismali" sarti) incelenirken cikan gercek hatalar:
+
+1. **Kurulum basarisiz olsa bile "basarili" gorunuyordu (gercek hata).** Yonetici olmayan yolda
+   yukseltilmis cocuk surec `$LASTEXITCODE`'u bir degiskene atiyor ama kimse okumuyordu; disarida
+   sabit `'0'` yazdiriliyordu. Yani Office kurulumu hata verse de kullanici "Kurulum bitti" goruyordu.
+   Cozum: cocuk surec cikis kodunu gecici dosyaya yazar, ebeveyn okur; `0` → yesil "bitti",
+   digeri → kirmizi "TAMAMLANMADI (kod)".
+
+2. **Culture trap (ayni tuzagin ucuncu ornegi).** ODT indirme linki regex'i `'IgnoreCase'` kullaniyordu,
+   `CultureInvariant` yoktu (satir 619). tr-TR'de `I` != `i` oldugu icin buyuk harf iceren bir link
+   sessizce kacardi. `RegexOptions` enum'u ile duzeltildi.
+
+3. **Yapilandirma XML'i test edilemiyordu.** Kurulum XML'i `Install-OfficeLTSC` govdesinde gomulu
+   here-string idi. `Get-OfficeConfigXml` fonksiyonuna cikarildi; artik `-SelfTest` XML'i **parse edip**
+   urun/kanal/dil/dislama alanlarini dogrular. ODT gecersiz XML'de kurulumu reddettigi icin bu
+   gercek bir koruma.
+
+### Dogrulama (olcumle)
+
+- `-SelfTest` PS 5.1 + pwsh 7: **20/20 OK** (6 yeni office cfg kontrolu dahil).
+- Negatif test: dil alanina `tr<us` sokulunca XML parse **False** donuyor → test gercekten yakaliyor
+  (bos/bos-gecen bir test degil). Iyi halde parse True, urun=ProPlus2024Volume, kanal=PerpetualVL2024.
+- Dil girdisi enjeksiyonu: `a"><x`, `tr<us`, `tr-tr-tr-tr-tr` reddediliyor (regex dogrulamasi).
+- `.cmd` cift tik baslatici: `ActivaterWindows.cmd -SelfTest` → SELFTEST OK (arguman aktarimi calisiyor).
+- **Canli tek-satir kabul testi (stok makine taklidi):** `powershell.exe -NoProfile -Command "<TLS12>; irm <url> | iex"`
+  → HTTP 200, icerik push edilen surumle **bayt-bayt ayni** (SHA256 E8F31B91...), menu cizildi, 6,3 sn'de exit=0.
+
 ## 2026-10-16 — v2.1.1: gizli calistirma kilitlenmesi + gunluk yaris durumu duzeltildi
 
 Onceki turun incelemesinde cikan ve **olcumle dogrulanan** iki gercek hata giderildi.

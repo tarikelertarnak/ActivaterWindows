@@ -80,6 +80,7 @@ $Strings = @{
         inst_start = 'Office kuruluyor, bir kac dakika surebilir...'
         inst_uac = 'Office kuruluyor (UAC izni gerekecek)...'
         inst_done = 'Kurulum bitti (cikis kodu: {0}).'
+        inst_fail = 'Office kurulumu TAMAMLANMADI (cikis kodu: {0}). Ayrintili log: %TEMP%\OfficeSetup*.log'
         uac_cancel = 'Kurulum iptal edildi (UAC reddedildi).'
         done = '{0} tamamlandi (cikis kodu: {1}).'
         uac_cancel2 = '{0} iptal edildi (UAC reddedildi).'
@@ -142,6 +143,7 @@ $Strings = @{
         inst_start = 'Installing Office, this may take a few minutes...'
         inst_uac = 'Installing Office (UAC prompt will appear)...'
         inst_done = 'Install finished (exit code: {0}).'
+        inst_fail = 'Office install did NOT complete (exit code: {0}). Details: %TEMP%\OfficeSetup*.log'
         uac_cancel = 'Install cancelled (UAC declined).'
         done = '{0} finished (exit code: {1}).'
         uac_cancel2 = '{0} cancelled (UAC declined).'
@@ -589,6 +591,29 @@ function Resolve-OfficeLang {
     }
 }
 
+function Get-OfficeConfigXml {
+    param([string]$Lang, [string[]]$ExcludeIds = @())
+    $excludes = ($ExcludeIds | ForEach-Object { "`n    <ExcludeApp ID=`"$_`" />" }) -join ''
+    @"
+<Configuration ID="aw-office-ltsc-2024">
+  <Add OfficeClientEdition="64" Channel="PerpetualVL2024">
+    <Product ID="ProPlus2024Volume" PIDKEY="XJ2XN-FW8RK-P4HMP-DKDBV-GCVGB">
+    <Language ID="$Lang" />$excludes
+    </Product>
+  </Add>
+  <Property Name="SharedComputerLicensing" Value="0" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
+  <Property Name="DeviceBasedLicensing" Value="0" />
+  <Property Name="SCLCacheOverride" Value="0" />
+  <Property Name="AUTOACTIVATE" Value="1" />
+  <Property Name="PINNEDICONS" Value="FALSE" />
+  <Property Name="MigrateArch" Value="FALSE" />
+  <Updates Enabled="FALSE" />
+  <RemoveMSI />
+</Configuration>
+"@
+}
+
 function Install-OfficeLTSC {
     param([switch]$SkipActivate)
     Write-Host ''
@@ -616,7 +641,8 @@ function Install-OfficeLTSC {
         Write-Host (T 'odt_dl') -ForegroundColor DarkGray
         try {
             $conf = Invoke-WebRequest -Uri 'https://www.microsoft.com/en-us/download/details.aspx?id=49117' -UseBasicParsing
-            $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', 'IgnoreCase').Value
+            # CultureInvariant sart: tr-TR'de 'I' != 'i', yani düz 'IgnoreCase' buyuk harfli linki kacirir.
+            $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [Text.RegularExpressions.RegexOptions]::CultureInvariant).Value
             if (-not $link) { throw 'download link not found on page' }
             Save-File -Url $link -OutFile $odt
         } catch {
@@ -637,50 +663,42 @@ function Install-OfficeLTSC {
     } else {
         $excludeIds = @('Access', 'Lync', 'OneDrive', 'OneNote', 'Outlook', 'Publisher')
     }
-    $excludes = ($excludeIds | ForEach-Object { "`n    <ExcludeApp ID=`"$_`" />" }) -join ''
 
     Write-Host (T 'extract') -ForegroundColor DarkGray
     Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait -WindowStyle Hidden
     $setup = Join-Path $work 'setup.exe'
     if (-not (Test-Path $setup)) { Write-Host (T 'extract_fail') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
-    $config = @"
-<Configuration ID="aw-office-ltsc-2024">
-  <Add OfficeClientEdition="64" Channel="PerpetualVL2024">
-    <Product ID="ProPlus2024Volume" PIDKEY="XJ2XN-FW8RK-P4HMP-DKDBV-GCVGB">
-    <Language ID="$lang" />$excludes
-    </Product>
-  </Add>
-  <Property Name="SharedComputerLicensing" Value="0" />
-  <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
-  <Property Name="DeviceBasedLicensing" Value="0" />
-  <Property Name="SCLCacheOverride" Value="0" />
-  <Property Name="AUTOACTIVATE" Value="1" />
-  <Property Name="PINNEDICONS" Value="FALSE" />
-  <Property Name="MigrateArch" Value="FALSE" />
-  <Updates Enabled="FALSE" />
-  <RemoveMSI />
-</Configuration>
-"@
+    $config = Get-OfficeConfigXml -Lang $lang -ExcludeIds $excludeIds
     $configPath = Join-Path $work 'Configuration.xml'
     [IO.File]::WriteAllText($configPath, $config)
 
     $isAdmin = [bool]([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match 'S-1-5-32-544')
+    $rcFile = Join-Path $work 'rc.txt'
+    $rc = $null
     try {
         if ($isAdmin) {
             Write-Host (T 'inst_start') -ForegroundColor DarkGray
             $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$configPath`"" -Wait -PassThru -WindowStyle Hidden
-            Write-Host ((T 'inst_done') -f $p.ExitCode) -ForegroundColor Green
+            $rc = $p.ExitCode
         } else {
+            # Yukseletilen cocuk surec kendi cikis kodunu yazar. Aksi halde kurulum basarisiz olsa bile
+            # 'basarili' gorunurdu (eski hata).
             Write-Host (T 'inst_uac') -ForegroundColor DarkGray
-            Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; `$RC = `$LASTEXITCODE`""
-            Write-Host ((T 'inst_done') -f '0') -ForegroundColor Green
+            Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII"
+            if (Test-Path $rcFile) {
+                $rcTxt = (Get-Content -LiteralPath $rcFile -Raw).Trim()
+                if ($rcTxt -match '^-?\d+$') { $rc = [int]$rcTxt }
+            }
         }
     } catch {
         Write-Host (T 'uac_cancel') -ForegroundColor Yellow
         Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
         return
     }
+    if ($rc -eq 0) { Write-Host ((T 'inst_done') -f $rc) -ForegroundColor Green }
+    elseif ($rc) { Write-Host ((T 'inst_fail') -f $rc) -ForegroundColor Red }
+    else { Write-Host ((T 'inst_fail') -f '?') -ForegroundColor Yellow }
     Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
 
     if (-not $SkipActivate) {
@@ -821,6 +839,20 @@ if ($args -contains '-SelfTest') {
 
     # gizli calistirma asilmasin diye zaman asimi tanimli ve makul
     Assert 'gizli zaman asimi tanimli' ([int]$HiddenTimeoutSec -gt 60)
+
+    # Office kurulum yapilandirmasi: ODT gecersiz XML'de kurulumu reddeder -> her surumde dogrula.
+    $cfgTxt = Get-OfficeConfigXml -Lang 'tr-tr' -ExcludeIds @('Access', 'Outlook')
+    $cfgXml = $null
+    try { $cfgXml = [xml]$cfgTxt } catch { }
+    Assert 'office cfg: gecerli XML' ($null -ne $cfgXml)
+    if ($cfgXml) {
+        $ns = $cfgXml.Configuration.Add.Product
+        Assert 'office cfg: dil dogru'    ($ns.Language.ID -eq 'tr-tr')
+        Assert ('office cfg: urun + kanal') ($ns.ID -eq 'ProPlus2024Volume' -and $cfgXml.Configuration.Add.Channel -eq 'PerpetualVL2024')
+        Assert ('office cfg: ExcludeApp sayisi 2') (@($ns.ExcludeApp).Count -eq 2)
+        Assert 'office cfg: otomatik etkinlestirme' (@($cfgXml.Configuration.Property | Where-Object { $_.Name -eq 'AUTOACTIVATE' }).Value -eq '1')
+    }
+    Assert 'office cfg: hic dislama yoksa bos' (-not (Test-Match (Get-OfficeConfigXml '' @()) 'ExcludeApp'))
 
     # TR/EN anahtar paritesi
     $tk = @($Strings['tr'].Keys); $ek = @($Strings['en'].Keys)
