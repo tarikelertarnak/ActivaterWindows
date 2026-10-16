@@ -1,5 +1,26 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.0.3: gizli kurulum penceresi, indirme barı, dil listesi, banner
+
+### Degisiklikler
+- **Baslik:** "ActivaterWindows — Terminal" → "ActivaterWindows"; site linki `https://tarikelertarnak.pages.dev/` banner'a eklendi.
+- **Gizli Office kurulumu:** ODT ayiklama + `setup.exe /configure` + elevated (`powershell.exe -Verb RunAs`)
+  hepsi `-WindowStyle Hidden` ile calisiyor. Kullanici artik o setup.exe penceresini gormez.
+- **Indirme cubugu (gercek, chunked):** WebClient event handler'lari senkron cagrida ATESLENMIYOR
+  (kanit: testte `FIRED COUNT: 0`) → `Invoke-Download` 64KB'lik chunk dongusuyle `HttpWebRequest`
+  stream'ini okuyup `\r` ile gercek yuzde + saniye basiyor. Yuzde degismedikce tekrar basmiyor (jitter yok).
+- **Dil listesi:** 83 Office dil kodu alfabetik numarali listede (5 kolon). Kod yaz ya da numara sec;
+  numarada "N) kod — onayliyor musun? Enter=evet 0=geri" onayi. Bos Enter = otomatik.
+  Yeni `Resolve-OfficeLang` + `Show-LangList`.
+- **Banner:** basitlestirildi (36 karakter genislik), site + repo linki.
+
+### Dogrulama
+- Parse: `PARSE OK`.
+- i18n: `I18N TEST OK` (TR/EN anahtar setleri esit).
+- Bar/liste testi: `LIST COUNT: 83`, `SORT OK`, `tr-tr numarasi: 76` (index math dogru),
+  `HASH OK`, `SIZE: 3.4 MB`, `DL+LIST TEST OK` — chunked bar canli render edildi.
+- Event kaniti: WebClient sync event `FIRED COUNT: 0` (neden chunked'a gecildigi).
+
 ## 2026-10-16 — v2.0.2: arayuz dili (tr/en), HEPSINI YAP, KMS kaldirildi
 
 ### Degisiklikler

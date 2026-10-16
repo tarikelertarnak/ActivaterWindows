@@ -70,11 +70,28 @@ irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/Acti
 | 4 | Windows 10 ESU | **TSforge** | Kalıcı |
 | 5 | Aktivasyon durumu | MAS Check | — |
 | 6 | **TAM MAS menüsü** | Tüm özellikler: Troubleshoot, Windows/Office sürüm değiştirme, $OEM$ klasörü, changelog | — |
-| 7 | Office LTSC Pro Plus 2024 kurulumu | ODT + otomatik Ohook teklifi | — |
+| 7 | Office LTSC Pro Plus 2024 kurulumu | ODT + gizli kurulum penceresi + otomatik Ohook teklifi | — |
 | 8 | **HEPSINI YAP** | Ofis yoksa kurar → Windows + ESU + Office TSforge ile tek geçişte → durum raporu | Kalıcı |
 | L | Arayuz dili (Otomatik / Turkce / English) | — | — |
 
 > Online KMS (180 gün) menüden kaldırıldı — kalıcı TSforge varken gereksiz. MAS'ın Tam Menüsü'nden (6) erişilebilir.
+
+### Office dili seçimi
+
+Kurulumda 83 Office dil kodu **alfabetik numaralı liste** halinde gösterilir:
+
+- `tr-tr` gibi **kodu** yaz → direkt kabul
+- **Numara** yaz (ör. `76`) → "76) tr-tr — onaylıyor musun? Enter = evet, 0 = geri" onayı
+- **Boş Enter** → otomatik algılanan dil kullanılır
+
+### İndirme göstergesi
+
+Tüm indirmelerde gerçek yüzde çubugu + saniye sayacı:
+
+```
+  [############------------------]  40%    3s
+```
+
 
 ### Güvenlik Mimarisi
 

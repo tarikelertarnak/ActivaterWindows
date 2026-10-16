@@ -1,4 +1,4 @@
-# ActivaterWindows — Terminal Edition
+# ActivaterWindows
 # PowerShell + Windows 10/11. Aktivasyon: Microsoft Activation Scripts (pinned commit, SHA256 dogrulamali).
 # Tek satir: irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
 # Yerel: ActivaterWindows.cmd (cift tik) veya powershell -ExecutionPolicy Bypass -File ActivaterWindows.ps1
@@ -7,10 +7,14 @@
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
+$SiteUrl  = 'https://tarikelertarnak.pages.dev/'
 $Pinned   = '05c4f881efec946c0040cdd552d1afa9a519704b' # MAS commit
 $AioHash  = '850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA'
 $ChkHash  = '6DF2937385386D0C9682D351797E674583A410F4792BB7BE45302F40AB90287E'
 $script:UiLang = 'auto' # 'auto' | 'tr' | 'en'
+
+# Office C2R desteklenen diller (alfabetik, numarali liste secimi icin)
+$OfficeLangs = 'af-za am-et ar-sa as-in az-latn-az be-by bg-bg bn-bd bn-in bs-latn-ba ca-es cs-cz cy-gb da-dk de-de el-gr en-gb en-us es-es es-mx et-ee eu-es fa-ir fi-fi fil-ph fr-ca fr-fr gl-es gu-in he-il hi-in hr-hr hu-hu hy-am id-id is-is it-it ja-jp ka-ge kk-kz km-kh kn-in ko-kr ky-kg lo-la lt-lt lv-lv mk-mk ml-in mn-mn mr-in ms-my mt-mt nb-no ne-np nl-nl nn-no or-in pa-in pl-pl ps-af pt-br pt-pt ro-ro ru-ru si-lk sk-sk sl-si sq-al sr-latn-rs sv-se sw-ke ta-in te-in th-th tr-tr uk-ua ur-pk uz-latn-uz vi-vn zh-cn zh-tw zu-za' -split ' '
 
 # --- arayuz dili sozlugu ---
 $Strings = @{
@@ -30,11 +34,12 @@ $Strings = @{
         back = 'Menuye donmek icin Enter'
         sel12 = 'Secim (1/2)'
         langpick = 'Dil:  [1] Otomatik (su an: {0})  [2] Turkce  [3] English'
-        langcur = 'Arayuz dili su an: {0}'
-        olang = 'Office dili kodu [otomatik secildi: {0} — degistirmek istemiyorsan Enter a bas]'
+        olang = 'Office dili: kod yaz (ornek: tr-tr) veya asagidaki listeden numara sec [otomatik: {0}]'
+        olang_confirm = '{0}) {1} — onayliyor musun? Enter = evet, 0 = geri'
+        lang_head = 'Office dilleri (alfabetik):'
         mode_h = '  [1] Onerilen (hafif): Word, Excel, PowerPoint, OneDrive disi bilesenler kurulmaz'
         mode_t = '  [2] Tam paket: tum bilesenler'
-        invalid_lang = 'Gecersiz dil kodu.'
+        invalid_lang = 'Gecersiz dil kodu veya numara.'
         odt_local = 'ODT yerel kopyadan aliniyor: {0}'
         odt_dl = 'Office Deployment Tool indiriliyor (microsoft.com)...'
         odt_fail = 'ODT indirilemedi: {0}'
@@ -74,11 +79,12 @@ $Strings = @{
         back = 'Press Enter to return to menu'
         sel12 = 'Choice (1/2)'
         langpick = 'Language:  [1] Automatic (now: {0})  [2] Turkce  [3] English'
-        langcur = 'Interface language: {0}'
-        olang = 'Office language code [auto-detected: {0} — press Enter to keep]'
+        olang = 'Office language: type a code (e.g. tr-tr) or pick a number from the list below [auto: {0}]'
+        olang_confirm = '{0}) {1} — confirm? Enter = yes, 0 = back'
+        lang_head = 'Office languages (alphabetical):'
         mode_h = '  [1] Recommended (light): all components except Word, Excel, PowerPoint, OneDrive'
         mode_t = '  [2] Full: all components'
-        invalid_lang = 'Invalid language code.'
+        invalid_lang = 'Invalid language code or number.'
         odt_local = 'Using local ODT copy: {0}'
         odt_dl = 'Downloading Office Deployment Tool (microsoft.com)...'
         odt_fail = 'ODT download failed: {0}'
@@ -117,10 +123,11 @@ function T([string]$Key) {
 
 function Write-Banner {
     Write-Host ''
-    Write-Host '==========================================================' -ForegroundColor DarkCyan
-    Write-Host '  ActivaterWindows — Terminal' -ForegroundColor Cyan
+    Write-Host '=============================================' -ForegroundColor DarkCyan
+    Write-Host '  ActivaterWindows' -ForegroundColor Cyan
+    Write-Host "  $SiteUrl" -ForegroundColor DarkGray
     Write-Host "  $RepoUrl" -ForegroundColor DarkGray
-    Write-Host '==========================================================' -ForegroundColor DarkCyan
+    Write-Host '=============================================' -ForegroundColor DarkCyan
 }
 
 function Test-FullLanguageMode {
@@ -148,21 +155,67 @@ function Warn-AV {
     }
 }
 
+# --- indirme: gercek yuzde barı + saniye sayaci (chunked, senkron garantili) ---
+function Write-DlBar([long]$Done, [long]$Total, $Sw) {
+    $ratio = if ($Total -gt 0) { [math]::Min(1.0, $Done / $Total) } else { 0.0 }
+    $pct = [int]([math]::Round($ratio * 100))
+    if ($pct -eq $script:_lastPct) { return }
+    $script:_lastPct = $pct
+    $bars = [int]($ratio * 30)
+    $track = ('#' * $bars) + ('-' * (30 - $bars))
+    $el = if ($Sw) { [int]$Sw.Elapsed.TotalSeconds } else { 0 }
+    Write-Host ("`r  [{0}] {1,3}%  {2,3}s" -f $track, $pct, $el) -NoNewline
+}
+
+function Invoke-Download([string]$Url, [string]$OutFile) {
+    # chunked stream okuma — WebClient event'leri senkron cagrida calismaz, bu calisir
+    $req = [Net.HttpWebRequest]::Create($Url)
+    $req.Method = 'GET'
+    $req.Timeout = 60000
+    $req.UserAgent = 'ActivaterWindows'
+    $resp = $req.GetResponse()
+    $total = $resp.ContentLength
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $script:_lastPct = -1
+    $rs = $resp.GetResponseStream()
+    $fs = if ($OutFile) { [IO.File]::Create($OutFile) } else { New-Object IO.MemoryStream }
+    try {
+        $buf = New-Object byte[] (65536)
+        $read = 0; $done = 0
+        while (($read = $rs.Read($buf, 0, $buf.Length)) -gt 0) {
+            $fs.Write($buf, 0, $read)
+            $done += $read
+            Write-DlBar $done $total $sw
+        }
+        Write-Host ''
+        if ($fs -is [IO.MemoryStream]) { , $fs.ToArray() }
+    } finally {
+        $rs.Close(); $fs.Close(); $resp.Close()
+    }
+}
+
+function Get-WebString([string]$Url) {
+    $bytes = Invoke-Download $Url $null
+    if ($bytes) { [Text.Encoding]::UTF8.GetString($bytes) } else { $null }
+}
+
+function Save-File([string]$Url, [string]$OutFile) {
+    Invoke-Download $Url $OutFile | Out-Null
+}
+
 function Get-String([string[]]$Urls, [string]$Label) {
-    Write-Progress -Activity "$Label" -Status 'Please wait'
+    Write-Host $Label -ForegroundColor DarkGray
     $errors = @(); $response = $null
     foreach ($url in $Urls | Sort-Object { Get-Random }) {
         try {
-            if ($PSVersionTable.PSVersion.Major -ge 3) { $response = Invoke-RestMethod -Uri $url -UseBasicParsing }
-            else { $response = (New-Object Net.WebClient).DownloadString($url) }
-            break
+            $response = Get-WebString $url
+            if ($response) { break }
         } catch { $errors += $_ }
     }
-    Write-Progress -Activity "$Label" -Status 'Done' -Completed
     if (-not $response) {
         Warn-AV
         foreach ($e in $errors) { Write-Host "Hata: $($e.Exception.Message)" -ForegroundColor Red }
-        Write-Host (T 'dl_fail' -f $Label) -ForegroundColor Red
+        Write-Host ((T 'dl_fail') -f $Label) -ForegroundColor Red
     }
     $response
 }
@@ -226,9 +279,44 @@ function Test-OfficeC2R {
 
 function Default-OfficeLang {
     $c = ((Get-Culture).Name).ToLower()
-    if ($script:UiLang -eq 'tr') { if ($c -like 'tr*') { 'tr-tr' } else { 'tr-tr' } }
+    if ($script:UiLang -eq 'tr') { 'tr-tr' }
     elseif ($script:UiLang -eq 'en') { 'en-us' }
     else { $c }
+}
+
+function Show-LangList {
+    Write-Host ''
+    Write-Host (T 'lang_head') -ForegroundColor DarkCyan
+    for ($i = 0; $i -lt $OfficeLangs.Count; $i += 5) {
+        $row = ''
+        for ($j = $i; $j -lt ($i + 5) -and $j -lt $OfficeLangs.Count; $j++) {
+            $row += ('{0,3}) {1,-12}' -f ($j + 1), $OfficeLangs[$j])
+        }
+        Write-Host "  $row" -ForegroundColor DarkGray
+    }
+    Write-Host ''
+}
+
+function Resolve-OfficeLang {
+    $def = Default-OfficeLang
+    while ($true) {
+        Show-LangList
+        $in = Read-Host ((T 'olang') -f $def)
+        if (-not $in) { return $def }
+        if ($in -match '^\d+$') {
+            $n = [int]$in
+            if ($n -ge 1 -and $n -le $OfficeLangs.Count) {
+                $code = $OfficeLangs[$n - 1]
+                $ans = Read-Host ((T 'olang_confirm') -f $n, $code)
+                if ($ans -eq '0') { continue }
+                return $code
+            }
+            Write-Host (T 'invalid_lang') -ForegroundColor Red
+            continue
+        }
+        if ($in -match '^[a-z]{2}(-[a-z0-9]{2,8})?$') { return $in }
+        Write-Host (T 'invalid_lang') -ForegroundColor Red
+    }
 }
 
 function Install-OfficeLTSC {
@@ -237,9 +325,7 @@ function Install-OfficeLTSC {
     Write-Host (T 'mode_h')
     Write-Host (T 'mode_t')
     $mode = Read-Host (T 'sel12')
-    $lang = Read-Host ((T 'olang') -f (Default-OfficeLang))
-    if (-not $lang) { $lang = (Default-OfficeLang) }
-    if ($lang -notmatch '^[a-z]{2}(-[a-z0-9]{2,8})?$') { Write-Host (T 'invalid_lang') -ForegroundColor Red; return }
+    $lang = Resolve-OfficeLang
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
     New-Item -ItemType Directory -Path $work -Force | Out-Null
@@ -260,8 +346,7 @@ function Install-OfficeLTSC {
             $conf = Invoke-WebRequest -Uri 'https://www.microsoft.com/en-us/download/details.aspx?id=49117' -UseBasicParsing
             $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', 'IgnoreCase').Value
             if (-not $link) { throw 'download link not found on page' }
-            if ($PSVersionTable.PSVersion.Major -ge 3) { Invoke-WebRequest -Uri $link -OutFile $odt -UseBasicParsing }
-            else { (New-Object Net.WebClient).DownloadFile($link, $odt) }
+            Save-File -Url $link -OutFile $odt
         } catch {
             Write-Host ((T 'odt_fail') -f $_.Exception.Message) -ForegroundColor Red
             Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
@@ -271,7 +356,7 @@ function Install-OfficeLTSC {
     if ((Get-Item $odt).Length -lt 2MB) { Write-Host (T 'odt_small') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
     Write-Host (T 'extract') -ForegroundColor DarkGray
-    Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait
+    Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait -WindowStyle Hidden
     $setup = Join-Path $work 'setup.exe'
     if (-not (Test-Path $setup)) { Write-Host (T 'extract_fail') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
@@ -301,11 +386,11 @@ function Install-OfficeLTSC {
     try {
         if ($isAdmin) {
             Write-Host (T 'inst_start') -ForegroundColor DarkGray
-            $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$configPath`"" -Wait -PassThru
+            $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$configPath`"" -Wait -PassThru -WindowStyle Hidden
             Write-Host ((T 'inst_done') -f $p.ExitCode) -ForegroundColor Green
         } else {
             Write-Host (T 'inst_uac') -ForegroundColor DarkGray
-            Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; `$RC = `$LASTEXITCODE`""
+            Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; `$RC = `$LASTEXITCODE`""
             Write-Host ((T 'inst_done') -f '0') -ForegroundColor Green
         }
     } catch {
