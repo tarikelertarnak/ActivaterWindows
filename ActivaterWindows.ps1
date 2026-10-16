@@ -16,6 +16,20 @@ $script:UiLang = 'auto' # 'auto' | 'tr' | 'en'
 # Office C2R desteklenen diller (alfabetik, numarali liste secimi icin)
 $OfficeLangs = 'af-za am-et ar-sa as-in az-latn-az be-by bg-bg bn-bd bn-in bs-latn-ba ca-es cs-cz cy-gb da-dk de-de el-gr en-gb en-us es-es es-mx et-ee eu-es fa-ir fi-fi fil-ph fr-ca fr-fr gl-es gu-in he-il hi-in hr-hr hu-hu hy-am id-id is-is it-it ja-jp ka-ge kk-kz km-kh kn-in ko-kr ky-kg lo-la lt-lt lv-lv mk-mk ml-in mn-mn mr-in ms-my mt-mt nb-no ne-np nl-nl nn-no or-in pa-in pl-pl ps-af pt-br pt-pt ro-ro ru-ru si-lk sk-sk sl-si sq-al sr-latn-rs sv-se sw-ke ta-in te-in th-th tr-tr uk-ua ur-pk uz-latn-uz vi-vn zh-cn zh-tw zu-za' -split ' '
 
+# Office bilesenleri (ozel secim icin) — ODT ExcludeApp ID'leri
+$OfficeApps = @(
+    @{ n = 'Word';               id = 'Word' },
+    @{ n = 'Excel';              id = 'Excel' },
+    @{ n = 'PowerPoint';         id = 'PowerPoint' },
+    @{ n = 'Outlook';            id = 'Outlook' },
+    @{ n = 'Access';             id = 'Access' },
+    @{ n = 'Publisher';          id = 'Publisher' },
+    @{ n = 'OneNote';            id = 'OneNote' },
+    @{ n = 'OneDrive';           id = 'OneDrive' },
+    @{ n = 'Skype for Business'; id = 'Lync' }
+)
+$OfficeAppsRecommended = @('Word', 'Excel', 'PowerPoint')
+
 # --- arayuz dili sozlugu ---
 $Strings = @{
     tr = @{
@@ -32,13 +46,21 @@ $Strings = @{
         ml = '  [L] Arayuz dilini degistir'
         choice = 'Secim'
         back = 'Menuye donmek icin Enter'
-        sel12 = 'Secim (1/2)'
+        sel12 = 'Secim (1/2/3)'
         langpick = 'Dil:  [1] Otomatik (su an: {0})  [2] Turkce  [3] English'
         olang = 'Office dili: kod yaz (ornek: tr-tr) veya asagidaki listeden numara sec [otomatik: {0}]'
         olang_confirm = '{0}) {1} — onayliyor musun? Enter = evet, 0 = geri'
         lang_head = 'Office dilleri (alfabetik):'
         mode_h = '  [1] Onerilen (hafif): Word, Excel, PowerPoint, OneDrive disi bilesenler kurulmaz'
         mode_t = '  [2] Tam paket: tum bilesenler'
+        mode_c = '  [3] Ozel Secim : hangi bilesenin kurulacagini kendin sec'
+        app_head = '--- Ozel Secim / Custom Selection ---'
+        app_hint = 'Ac/Kapa: numaralari virgulle yaz (ornek: 1,3,5)  |  a = tumu   n = hicbiri   r = onerilen   Enter = onayla'
+        app_sel = 'Secim'
+        app_install = 'kurulacak'
+        app_skip = 'atlanacak'
+        app_none = 'Hicbir bilesen secilmedi, en az birini sec!'
+        app_done = 'Ozel secim: {0} bilesen kurulacak, {1} bilesen atlanacak.'
         invalid_lang = 'Gecersiz dil kodu veya numara.'
         odt_local = 'ODT yerel kopyadan aliniyor: {0}'
         odt_dl = 'Office Deployment Tool indiriliyor (microsoft.com)...'
@@ -77,13 +99,21 @@ $Strings = @{
         ml = '  [L] Change interface language'
         choice = 'Choice'
         back = 'Press Enter to return to menu'
-        sel12 = 'Choice (1/2)'
+        sel12 = 'Choice (1/2/3)'
         langpick = 'Language:  [1] Automatic (now: {0})  [2] Turkce  [3] English'
         olang = 'Office language: type a code (e.g. tr-tr) or pick a number from the list below [auto: {0}]'
         olang_confirm = '{0}) {1} — confirm? Enter = yes, 0 = back'
         lang_head = 'Office languages (alphabetical):'
         mode_h = '  [1] Recommended (light): all components except Word, Excel, PowerPoint, OneDrive'
         mode_t = '  [2] Full: all components'
+        mode_c = '  [3] Custom : choose exactly which components install'
+        app_head = '--- Custom Selection ---'
+        app_hint = 'Toggle: type numbers separated by commas (e.g. 1,3,5)  |  a = all   n = none   r = recommended   Enter = confirm'
+        app_sel = 'Choice'
+        app_install = 'install'
+        app_skip = 'skip'
+        app_none = 'No component selected, pick at least one!'
+        app_done = 'Custom: {0} components will install, {1} will be skipped.'
         invalid_lang = 'Invalid language code or number.'
         odt_local = 'Using local ODT copy: {0}'
         odt_dl = 'Downloading Office Deployment Tool (microsoft.com)...'
@@ -284,6 +314,50 @@ function Default-OfficeLang {
     else { $c }
 }
 
+function Show-AppPicker($sel) {
+    Write-Host ''
+    Write-Host (T 'app_head') -ForegroundColor Cyan
+    for ($i = 0; $i -lt $OfficeApps.Count; $i++) {
+        $a = $OfficeApps[$i]
+        $on = [bool]$sel[$a.id]
+        $mark = if ($on) { '[X]' } else { '[ ]' }
+        $col = if ($on) { 'Green' } else { 'DarkGray' }
+        Write-Host ("   {0,2}) " -f ($i + 1)) -ForegroundColor Cyan -NoNewline
+        Write-Host ("{0} " -f $mark) -ForegroundColor $col -NoNewline
+        Write-Host $a.n -ForegroundColor $col
+    }
+    Write-Host ''
+    Write-Host (T 'app_hint') -ForegroundColor DarkYellow
+}
+
+function Select-OfficeApps {
+    $sel = @{}
+    foreach ($a in $OfficeApps) { $sel[$a.id] = ($OfficeAppsRecommended -contains $a.id) }
+    while ($true) {
+        Show-AppPicker $sel
+        $in = Read-Host (T 'app_sel')
+        if (-not $in) { break }
+        $low = $in.Trim().ToLower()
+        if ($low -eq 'a') { foreach ($a in $OfficeApps) { $sel[$a.id] = $true }; continue }
+        if ($low -eq 'n') { foreach ($a in $OfficeApps) { $sel[$a.id] = $false }; continue }
+        if ($low -eq 'r') { foreach ($a in $OfficeApps) { $sel[$a.id] = ($OfficeAppsRecommended -contains $a.id) }; continue }
+        foreach ($part in ($in -split ',')) {
+            $p = $part.Trim()
+            if ($p -match '^\d+$') {
+                $idx = [int]$p - 1
+                if ($idx -ge 0 -and $idx -lt $OfficeApps.Count) {
+                    $id = $OfficeApps[$idx].id
+                    $sel[$id] = -not [bool]$sel[$id]
+                }
+            }
+        }
+    }
+    $chosen = @($OfficeApps | Where-Object { $sel[$_.id] })
+    if ($chosen.Count -eq 0) { Write-Host (T 'app_none') -ForegroundColor Red; return (Select-OfficeApps) }
+    Write-Host ((T 'app_done') -f $chosen.Count, ($OfficeApps.Count - $chosen.Count)) -ForegroundColor Green
+    $chosen
+}
+
 function Show-LangList {
     Write-Host ''
     Write-Host (T 'lang_head') -ForegroundColor DarkCyan
@@ -322,8 +396,9 @@ function Resolve-OfficeLang {
 function Install-OfficeLTSC {
     Write-Host ''
     Write-Host '--- Office LTSC Professional Plus 2024 ---' -ForegroundColor Cyan
-    Write-Host (T 'mode_h')
-    Write-Host (T 'mode_t')
+    Write-Host (T 'mode_h') -ForegroundColor White
+    Write-Host (T 'mode_t') -ForegroundColor White
+    Write-Host (T 'mode_c') -ForegroundColor Cyan
     $mode = Read-Host (T 'sel12')
     $lang = Resolve-OfficeLang
 
@@ -355,12 +430,23 @@ function Install-OfficeLTSC {
     }
     if ((Get-Item $odt).Length -lt 2MB) { Write-Host (T 'odt_small') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
+    # bilesen secimi → ExcludeApp listesi
+    if ($mode -eq '3') {
+        $chosen = @(Select-OfficeApps)
+        $chosenIds = $chosen | ForEach-Object { $_.id }
+        $excludeIds = $OfficeApps | ForEach-Object { $_.id } | Where-Object { $chosenIds -notcontains $_ }
+    } elseif ($mode -eq '2') {
+        $excludeIds = @()
+    } else {
+        $excludeIds = @('Access', 'Lync', 'OneDrive', 'OneNote', 'Outlook', 'Publisher')
+    }
+    $excludes = ($excludeIds | ForEach-Object { "`n    <ExcludeApp ID=`"$_`" />" }) -join ''
+
     Write-Host (T 'extract') -ForegroundColor DarkGray
     Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -Wait -WindowStyle Hidden
     $setup = Join-Path $work 'setup.exe'
     if (-not (Test-Path $setup)) { Write-Host (T 'extract_fail') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
 
-    $excludes = if ($mode -eq '2') { '' } else { "`n    <ExcludeApp ID=`"Access`" />`n    <ExcludeApp ID=`"Lync`" />`n    <ExcludeApp ID=`"OneDrive`" />`n    <ExcludeApp ID=`"OneNote`" />`n    <ExcludeApp ID=`"Outlook`" />`n    <ExcludeApp ID=`"Publisher`" />" }
     $config = @"
 <Configuration ID="aw-office-ltsc-2024">
   <Add OfficeClientEdition="64" Channel="PerpetualVL2024">

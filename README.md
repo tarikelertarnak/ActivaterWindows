@@ -84,6 +84,27 @@ Kurulumda 83 Office dil kodu **alfabetik numaralı liste** halinde gösterilir:
 - **Numara** yaz (ör. `76`) → "76) tr-tr — onaylıyor musun? Enter = evet, 0 = geri" onayı
 - **Boş Enter** → otomatik algılanan dil kullanılır
 
+### Office bileşen seçimi (3 mod)
+
+| Mod | Ne kurar |
+|---|---|
+| **1 — Önerilen (hafif)** | Word, Excel, PowerPoint (Access, Outlook, Publisher, OneNote, OneDrive, Skype hariç) |
+| **2 — Tam paket** | Tüm bileşenler |
+| **3 — Özel Seçim** | 9 bileşeni tek tek işaretle |
+
+Özel Seçim renkli işaret-kaldır listesi sunar:
+
+```
+  1) [X] Word          4) [ ] Outlook         7) [ ] OneNote
+  2) [X] Excel         5) [ ] Access          8) [ ] OneDrive
+  3) [X] PowerPoint    6) [ ] Publisher       9) [ ] Skype for Business
+```
+
+- Numaraları virgülle yaz, aç/kapa: `1,3,5`
+- `a` = tümü · `n` = hiçbiri · `r` = önerilen · **Enter** = onayla
+- Yeşil = kurulacak, gri = atlanacak. En az bir bileşen şart.
+
+
 ### İndirme göstergesi
 
 Tüm indirmelerde gerçek yüzde çubugu + saniye sayacı:

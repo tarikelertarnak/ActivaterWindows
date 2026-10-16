@@ -1,5 +1,24 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.0.4: Office bilesen secimi (Ozel Secim), renkli arayuz
+
+### Degisiklikler
+- **Office kurulum modu 3 secenek oldu:** [1] Onerilen (hafif), [2] Tam paket, **[3] Ozel Secim**.
+- **Ozel Secim (`Select-OfficeApps`):** 9 bilesen (Word, Excel, PowerPoint, Outlook, Access, Publisher,
+  OneNote, OneDrive, Skype for Business) numarali tuket-sec listesi. Komutlar: `1,3,5` toggle,
+  `a`=tumu, `n`=hicbiri, `r`=onerilen, Enter=onayla. Yesil [X]=kurulacak, gri [ ]=atlanacak.
+  En az bir bilesen zorunlu; secilen → ODT `ExcludeApp` listesine cevrilir.
+- **Renklendirme:** mod menusu renkli, app picker renkli, secim sonucu yesil ozet satiri.
+- **Tam TR/EN cevirisi** yeni arayuz icin (app_head, app_hint, app_sel, app_done, mode_c...).
+- `sel12` → `Secim (1/2/3)`; recommended exclude listesi sabit `$OfficeAppsRecommended`'dan turetiliyor.
+
+### Dogrulama
+- Parse: `PARSE OK`.
+- Picker testi (Read-Host mock'lu): toggle (5,7 ac + 1 kapat → Word cikti), `a`→9, `n`+`2`→tek Excel,
+  exclude uretimi 8 dogru → `PICKER TEST OK`.
+- i18n: `KEYS OK: 51 anahtar x 2 dil`, `I18N TEST OK`.
+- Bulunan hata: `, $chosen` donusu array'i cift sarmaliyordu (Count=1 gorunuyordu) → duzeltildi.
+
 ## 2026-10-16 — v2.0.3: gizli kurulum penceresi, indirme barı, dil listesi, banner
 
 ### Degisiklikler
