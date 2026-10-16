@@ -1,31 +1,49 @@
 # ActivaterWindows
-# PowerShell + Windows 10/11. Aktivasyon motoru: masaustu kaynagindan otomatik izlenir (upstream commit+hash),
-# olmazsa gomulu pin, o da olmazsa son dogrulanmis yerel kopya. Her durumda SHA256 ile dogrulanir.
-# Metot adlari arayuzde gosterilmez; etkinlestirme arka planda (penceresiz) calisir.
-# Tek satir: irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/ActivaterWindows.ps1 | iex
-# Yerel: ActivaterWindows.cmd (cift tik) veya powershell -ExecutionPolicy Bypass -File ActivaterWindows.ps1
-# Parametre: -Probe (indir+dogrula testi, calistirmadan cikar) | diger "/"-li argumanlar dogrudan MAS AIO'ya iletilir.
+# PowerShell for Windows 10/11. The activation engine is followed upstream (live commit + hash);
+# if that fails, a pinned commit; if that fails, the last verified local copy. Always SHA256-verified.
+# Method names are never shown in the UI; activation runs with no visible window.
+# One-liner: irm https://tarikelertarnak.github.io/aw.ps1 | iex
+# Local: ActivaterWindows.cmd (double-click) or powershell -ExecutionPolicy Bypass -File ActivaterWindows.ps1
+# Switches: -SelfTest (offline checks, then exit) | -Probe (download + verify engine, then exit)
+#           -Refresh (ignore the engine cache) | any "/" argument is forwarded to the activation engine
 
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+$Version  = '2.5.0'
+$Author   = 'Tarık Eler'
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
 $SiteUrl  = 'https://tarikelertarnak.pages.dev/'
-$Pinned   = '05c4f881efec946c0040cdd552d1afa9a519704b' # MAS commit
+$ShortUrl = 'https://tarikelertarnak.github.io/aw.ps1'
+$Pinned   = '05c4f881efec946c0040cdd552d1afa9a519704b' # engine commit
 $AioHash  = '850F979665FB93999ACAE93F4790C1FF8ED2041532060B7966A121C2D29A0BFA'
 $ChkHash  = '6DF2937385386D0C9682D351797E674583A410F4792BB7BE45302F40AB90287E'
+
+# Office Deployment Tool (Microsoft's own downloader). It is mirrored to our releases so a broken
+# Microsoft download page or a blocked download.microsoft.com is not fatal. Verified by hash when
+# the mirror is refreshed (tools/Mirror-ODT.ps1), and always by size + PE header at use time.
+$OdtMirrorUrl  = "$RepoUrl/releases/download/odt-mirror/officedeploymenttool.exe"
+$OdtPinnedUrl  = 'https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_20326-20112.exe'
+$OdtPinnedHash = 'FBB64358FD4168ACD52EE4EFE47FFD032B6231DFB415AE2DCE61B0E58BA67F86'
+$OdtMinBytes   = 2MB
+
 $CacheDir = Join-Path $env:LOCALAPPDATA 'ActivaterWindows'
 $AioCache = Join-Path $CacheDir 'engine.cmd'
 $AioCacheHash = Join-Path $CacheDir 'engine.sha256'
 $ChkCache = Join-Path $CacheDir 'check.cmd'
 $ChkCacheHash = Join-Path $CacheDir 'check.sha256'
-# Gizli calisan motorun ust siniri (saniye). Sonda tus bekleyen akislar bu sure sonunda kapatilir.
+# Upper bound (seconds) for a hidden engine run. Flows that end waiting for a keypress are killed after this.
 $HiddenTimeoutSec = 900
+# Reuse the cached engine without any network round-trip while it is younger than this (startup speed).
+# -Refresh (or -Probe) forces a fresh upstream check.
+$CacheMaxAgeHours = 24
 $script:UiLang = 'auto' # 'auto' | 'tr' | 'en'
+# Registry-based OS info is instant; WMI/CIM is not (measured 1.6-4.1 s), so it is cached per run.
+$script:WinInfo = $null
 
-# Office C2R desteklenen diller (alfabetik, numarali liste secimi icin)
+# Live bar for percentage-less steps: a finished one passes at once, an unfinished one is cut off
 $OfficeLangs = 'af-za am-et ar-sa as-in az-latn-az be-by bg-bg bn-bd bn-in bs-latn-ba ca-es cs-cz cy-gb da-dk de-de el-gr en-gb en-us es-es es-mx et-ee eu-es fa-ir fi-fi fil-ph fr-ca fr-fr gl-es gu-in he-il hi-in hr-hr hu-hu hy-am id-id is-is it-it ja-jp ka-ge kk-kz km-kh kn-in ko-kr ky-kg lo-la lt-lt lv-lv mk-mk ml-in mn-mn mr-in ms-my mt-mt nb-no ne-np nl-nl nn-no or-in pa-in pl-pl ps-af pt-br pt-pt ro-ro ru-ru si-lk sk-sk sl-si sq-al sr-latn-rs sv-se sw-ke ta-in te-in th-th tr-tr uk-ua ur-pk uz-latn-uz vi-vn zh-cn zh-tw zu-za' -split ' '
 
-# Office bilesenleri (ozel secim icin) — ODT ExcludeApp ID'leri
+# A "/"-argument is forwarded straight to the AIO engine (e.g. ActivaterWindows.ps1 /HWID)
 $OfficeApps = @(
     @{ n = 'Word';               id = 'Word' },
     @{ n = 'Excel';              id = 'Excel' },
@@ -39,20 +57,21 @@ $OfficeApps = @(
 )
 $OfficeAppsRecommended = @('Word', 'Excel', 'PowerPoint')
 
-# --- arayuz dili sozlugu ---
+
 $Strings = @{
     tr = @{
         langline = 'Dil / Language :  [A] Otomatik (su an: {0})   [T] Turkce   [E] English'
-        m1 = '  [1] Windows 10/11 etkinlestir - kalici'
-        m2 = '  [2] Office etkinlestir        - kalici'
-        m3 = '  [3] Windows + ESU + Office    - kalici (tek gecis)'
-        m4 = '  [4] Windows 10 ESU            - kalici'
-        m5 = '  [5] Aktivasyon durumu - kontrol et'
-        m6 = '  [6] Office LTSC Pro Plus 2024 kur (dil + bilesen secimi)'
-        m7 = '  [7] HEPSINI ETKINLESTIR - mevcut her seyi kalici etkinlestir (kurulum yok)'
-        m8 = '  [8] HEPSINI YAP - eksikse Office kur + her seyi etkinlestir + tam MAS menusu'
-        mx = '  [0] Cikis'
-        ml = '  [L] Arayuz dilini degistir'
+        m1 = '  [1]  Windows etkinlestir        kalici dijital lisans'
+        m2 = '  [2]  Office etkinlestir         kalici'
+        m3 = '  [3]  Windows + ESU + Office     tek gecis'
+        m4 = '  [4]  Windows 10 ESU             kalici'
+        m5 = '  [5]  Etkinlestirme durumu       kontrol et'
+        m6 = '  [6]  Office LTSC 2024 kur       dil + bilesen secimi'
+        m7 = '  [7]  HEPSINI ETKINLESTIR        kurulum yok, hepsini etkinlestir'
+        m8 = '  [8]  HEPSINI YAP                kur + etkinlestir + tam menu'
+        m9 = '  [9]  Hakkinda'
+        mx = '  [0]  Cikis'
+        ml = '  [L]  Arayuz dilini degistir'
         choice = 'Secim'
         back = 'Menuye donmek icin Enter'
         sel12 = 'Secim (1/2/3)'
@@ -108,19 +127,57 @@ $Strings = @{
         status_lbl = 'Durum kontrolu'
         act_timeout = 'Motor {0} saniyede bitmedi ve kapatildi. Yukarida sonuc yoksa islem tamamlanmamis olabilir.'
         act_nolog = 'Motor calisti ama bildirilecek sonuc satiri yok. Ayrinti icin [5] durum kontrolunu kullan.'
+
+        author = 'Tarık Eler'
+        sec_win = 'WINDOWS'
+        sec_off = 'OFFICE'
+        sec_all = 'BIRLESIK'
+        sec_info = 'DURUM & BILGI'
+        esc_hint = 'Esc = geri'
+        about_head = 'HAKKINDA'
+        about_ver = 'Surum   : {0}'
+        about_by = 'Yapan   : {0}'
+        about_lic = 'Lisans  : MIT (uygulama) + GPL-3.0 (motor)'
+        about_site = 'Site    : {0}'
+        about_repo = 'Kaynak  : {0}'
+        about_short = 'Tek satir: {0}'
+        about_note = 'Aktivasyon motoru Microsoft Activation Scripts projesinden alinir (GPL-3.0). Lisans geregi atif korunur; arayuzde yontem adlari hicbir zaman gosterilmez.'
+        win_head = 'Windows etkinlestirme'
+        win_cur = 'Mevcut surum: {0}   build {1}   {2}'
+        win_a1 = '  [1]  Bu surumu etkinlestir             kalici dijital lisans'
+        win_a2 = '  [2]  Surum degistir, sonra etkinlestir mevcut surumler listelenir'
+        win_a3 = '  [3]  Windows 10 ESU etkinlestir        kalici'
+        win_eds = 'Bu yapiya kurulabilen Windows surumleri ({0}):'
+        win_eds_note = 'Liste WMI lisans ailelerinden okunur. Degisimi motorun kendi penceresi yapar; orada numarayla secersin.'
+        win_change_go = 'Surum degistirme araci aciliyor. Islem bittikten sonra etkinlestirme gerekir.'
+        win_change_ask = 'Simdi etkinlestirme calistirilsin mi? (E/h)'
+        odt_mirror = 'Microsoft indirmesi calismadi, GitHub yedeginden aliniyor...'
+        odt_pinned = 'Microsoft indirme sayfasi degismis, sabitlenmis Microsoft baglantisina geciliyor...'
+        odt_verify = 'ODT dogrulandi: {0} ({1:N1} MB)'
+        off_dl_first = 'Once kurulum araci indirilir, sonra dil ve bilesen sorulur.'
+        off_ready = 'Kurulum araci hazir. Simdi secimlerini yap:'
+        off_summary = 'Dil: {0}   Kurulacak: {1}'
+        off_go = 'Kurulum baslatilsin mi? (E/h)'
+        m0back = '  [0]  Geri'
+        odt_hash_fail = 'ODT butunluk kontrolu basarisiz, bu kaynak atlaniyor ({0}).'
+        win_eds_none = 'Surum listesi okunamadi (WMI). Motorun kendi penceresi yine de listeler.'
+        win_change_ask_go = 'Surum degistirme araci acilsin mi? (E/h)'
+        ce_dl = 'Surum degistirme araci indiriliyor'
+        ce_fail = 'Surum degistirme araci alinamadi, iptal.'
     }
     en = @{
         langline = 'Dil / Language :  [A] Automatic (now: {0})   [T] Turkce   [E] English'
-        m1 = '  [1] Activate Windows 10/11    - permanent'
-        m2 = '  [2] Activate Office           - permanent'
-        m3 = '  [3] Windows + ESU + Office    - permanent (single pass)'
-        m4 = '  [4] Windows 10 ESU            - permanent'
-        m5 = '  [5] Check activation status'
-        m6 = '  [6] Install Office LTSC Pro Plus 2024 (language + component picker)'
-        m7 = '  [7] ACTIVATE EVERYTHING - permanently activate everything present (no install)'
-        m8 = '  [8] DO EVERYTHING - install Office if missing + activate all + full MAS menu'
-        mx = '  [0] Exit'
-        ml = '  [L] Change interface language'
+        m1 = '  [1]  Activate Windows            permanent digital license'
+        m2 = '  [2]  Activate Office             permanent'
+        m3 = '  [3]  Windows + ESU + Office      single pass'
+        m4 = '  [4]  Windows 10 ESU              permanent'
+        m5 = '  [5]  Activation status           check'
+        m6 = '  [6]  Install Office LTSC 2024    language + component picker'
+        m7 = '  [7]  ACTIVATE EVERYTHING         no install, activate all'
+        m8 = '  [8]  DO EVERYTHING               install + activate + full menu'
+        m9 = '  [9]  About'
+        mx = '  [0]  Exit'
+        ml = '  [L]  Change interface language'
         choice = 'Choice'
         back = 'Press Enter to return to menu'
         sel12 = 'Choice (1/2/3)'
@@ -176,6 +233,43 @@ $Strings = @{
         status_lbl = 'Status check'
         act_timeout = 'The engine did not finish within {0}s and was terminated. If no result is shown above, the operation may be incomplete.'
         act_nolog = 'The engine ran but produced no reportable result line. Use [5] status check for details.'
+
+        author = 'Tarık Eler'
+        sec_win = 'WINDOWS'
+        sec_off = 'OFFICE'
+        sec_all = 'COMBINED'
+        sec_info = 'STATUS & INFO'
+        esc_hint = 'Esc = back'
+        about_head = 'ABOUT'
+        about_ver = 'Version : {0}'
+        about_by = 'Made by : {0}'
+        about_lic = 'License : MIT (app) + GPL-3.0 (engine)'
+        about_site = 'Site    : {0}'
+        about_repo = 'Source  : {0}'
+        about_short = 'One-liner: {0}'
+        about_note = 'The activation engine comes from the Microsoft Activation Scripts project (GPL-3.0). Attribution is kept for license compliance; method names are never shown in the UI.'
+        win_head = 'Windows activation'
+        win_cur = 'Current edition: {0}   build {1}   {2}'
+        win_a1 = '  [1]  Activate this edition             permanent digital license'
+        win_a2 = '  [2]  Change edition, then activate     lists the editions this build offers'
+        win_a3 = '  [3]  Activate Windows 10 ESU           permanent'
+        win_eds = 'Windows editions this build can serve ({0}):'
+        win_eds_note = 'Read from the WMI license families. The engine does the change in its own window, where you pick by number.'
+        win_change_go = 'Opening the edition changer. Activation is required after it finishes.'
+        win_change_ask = 'Run activation now? (Y/n)'
+        odt_mirror = 'Microsoft download failed, falling back to the GitHub mirror...'
+        odt_pinned = 'The Microsoft download page changed; trying the pinned Microsoft link...'
+        odt_verify = 'ODT verified: {0} ({1:N1} MB)'
+        off_dl_first = 'The setup tool downloads first, then you are asked for language and components.'
+        off_ready = 'Setup tool ready. Now make your choices:'
+        off_summary = 'Language: {0}   Installing: {1}'
+        off_go = 'Start the install? (Y/n)'
+        m0back = '  [0]  Back'
+        odt_hash_fail = 'ODT integrity check failed, skipping this source ({0}).'
+        win_eds_none = 'Could not read the edition list (WMI). The engine window will still list them.'
+        win_change_ask_go = 'Open the edition changer? (Y/n)'
+        ce_dl = 'Downloading the edition changer'
+        ce_fail = 'The edition changer could not be retrieved, aborting.'
     }
 }
 
@@ -190,28 +284,117 @@ function T([string]$Key) {
     if (-not $s) { $Key } else { $s }
 }
 
-# Turkce kulturde 'I' ile 'i' eslesmez: 'I'.ToLower() = 'ı' (noktasiz i). Bu yuzden
-# varsayilan -match/-like karsilastirmalari buyuk harfli metinde sessizce kacar (orn. "HWID").
-# Metin karsilastirmalarinda daima bu fonksiyonu kullan.
+
+
+
+# Case-insensitive matching that also works under tr-TR: .NET IgnoreCase alone treats 'I' != 'i' in
+# Turkish, which silently missed upper-case matches (e.g. "HWID", "LICENSED") three separate times.
 function Test-Match([string]$Text, [string]$Pattern) {
     [regex]::IsMatch($Text, $Pattern, [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [Text.RegularExpressions.RegexOptions]::CultureInvariant)
 }
 
-# Evet/hayir sorusu. TR: E = evet, EN: Y = yes. Enter = evet. Diger her giris = hayir.
+function Test-Admin {
+    [bool]([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match 'S-1-5-32-544')
+}
+
+# The "go back" token. Pulled out of Read-Input so the contract is testable without a console.
+function Test-BackToken([string]$Text) {
+    Test-Match $Text '^\s*esc\s*$'
+}
+
+# Line input that also reports Esc (go back). Read-Host cannot see Esc, so keys are read and echoed here.
+# Where no console is available (piped stdin, redirected test runs) it degrades to Read-Host, and the
+# literal token "esc" counts as the back action so that path stays testable.
+function Read-Input([string]$Prompt = '', [string]$Default = '') {
+    $shown = if ($Default) { "$Prompt [$Default]" } else { $Prompt }
+    if (-not [Console]::IsInputRedirected) {
+        try {
+            Write-Host "$shown > " -ForegroundColor Yellow -NoNewline
+            $buf = ''
+            while ($true) {
+                $k = [Console]::ReadKey($true)
+                if ($k.Modifiers -band [ConsoleModifiers]::Control -and $k.Key -eq 'C') { Write-Host ''; exit 130 }
+                if ($k.Key -eq 'Enter') { Write-Host ''; return @{ Text = $buf; Back = $false } }
+                if ($k.Key -eq 'Escape') {
+                    Write-Host ''
+                    Write-Host ('  << ' + (T 'esc_hint')) -ForegroundColor DarkYellow
+                    return @{ Text = ''; Back = $true }
+                }
+                if ($k.Key -eq 'Backspace') {
+                    if ($buf.Length -gt 0) { $buf = $buf.Substring(0, $buf.Length - 1); Write-Host "`b `b" -NoNewline }
+                    continue
+                }
+                if ($k.KeyChar -and [int][char]$k.KeyChar -ge 32) { $buf += $k.KeyChar; Write-Host $k.KeyChar -NoNewline }
+            }
+        } catch { }
+    }
+    # No console: read lines directly so that end-of-input is detectable. Read-Host cannot tell an
+    # exhausted pipe from a bare Enter, and an exhausted pipe would spin the menu loops forever.
+    Write-Host "$shown > " -ForegroundColor Yellow -NoNewline
+    $line = [Console]::In.ReadLine()
+    if ($null -eq $line) { throw [System.OperationCanceledException]::new('input closed') }
+    if (Test-BackToken $line) { return @{ Text = ''; Back = $true } }
+    @{ Text = $line; Back = $false }
+}
+
+# Yes/no. Enter = yes, Esc = no. TR: E = yes, EN: Y = yes; anything else = no.
 function Confirm([string]$Prompt) {
-    $ans = Read-Host $Prompt
-    if (-not $ans) { return $true }
-    if ((Get-UiLang) -eq 'tr') { return (Test-Match $ans '^\s*e(vet)?\s*$') }
-    Test-Match $ans '^\s*y(es)?\s*$'
+    $r = Read-Input $Prompt
+    if ($r.Back) { return $false }
+    if (-not $r.Text) { return $true }
+    if ((Get-UiLang) -eq 'tr') { return (Test-Match $r.Text '^\s*e(vet)?\s*$') }
+    Test-Match $r.Text '^\s*y(es)?\s*$'
 }
 
 function Write-Banner {
     Write-Host ''
     Write-Host '=============================================' -ForegroundColor DarkCyan
-    Write-Host '  ActivaterWindows' -ForegroundColor Cyan
+    Write-Host ("  ActivaterWindows  v$Version") -ForegroundColor Cyan
+    Write-Host ("  " + (T 'about_by') -f $script:Author) -ForegroundColor DarkGray
     Write-Host "  $SiteUrl" -ForegroundColor DarkGray
     Write-Host "  $RepoUrl" -ForegroundColor DarkGray
     Write-Host '=============================================' -ForegroundColor DarkCyan
+}
+
+# Registry only, and cached: instant. WMI/CIM is far slower (measured 1.6-4.1 s on this machine),
+# so nothing on the menu path may call it.
+function Get-WinInfo {
+    if ($script:WinInfo) { return $script:WinInfo }
+    $k = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -ErrorAction SilentlyContinue
+    $build = 0
+    if ($k -and $k.CurrentBuild) { $build = [int]$k.CurrentBuild }
+    # ProductName still reads "Windows 10" on Windows 11 builds, so the family comes from the build number.
+    $name = if ($build -ge 22000) { 'Windows 11' } else { 'Windows 10' }
+    $ed  = if ($k -and $k.EditionID) { [string]$k.EditionID } else { '?' }
+    $ver = if ($k -and $k.DisplayVersion) { [string]$k.DisplayVersion } else { '' }
+    $ubr = if ($k -and $null -ne $k.UBR) { [string]$k.UBR } else { '?' }
+    $arch = if ([Environment]::Is64BitOperatingSystem) { 'x64' } else { 'x86' }
+    $admin = Test-Admin
+    $role = if ($admin) { 'admin' } elseif ((Get-UiLang) -eq 'tr') { 'yetkisiz' } else { 'standard user' }
+    $script:WinInfo = @{
+        Name    = $name
+        Edition = $ed
+        Build   = $build
+        Admin   = $admin
+        Summary = ("{0} {1} {2} {3}.{4} {5} [{6}]" -f $name, $ed, $ver, $build, $ubr, $arch, $role)
+    }
+    $script:WinInfo
+}
+
+# The editions this build can serve, deduplicated. The engine reads the same WMI source; the query is
+# slow (measured 4.1 s, 61 rows with repeats) so it is only called from the Windows submenu.
+function Get-EditionList {
+    $q = "SELECT LicenseFamily FROM SoftwareLicensingProduct WHERE ApplicationID='55c92734-d682-4d71-983e-d6ec3f16059f' AND LicenseDependsOn is NULL"
+    try {
+        @(Get-CimInstance -Query $q -ErrorAction Stop |
+            Select-Object -ExpandProperty LicenseFamily -Unique |
+            Where-Object { $_ } | Sort-Object)
+    } catch { @() }
+}
+
+function Write-Section([string]$Title) {
+    Write-Host ''
+    Write-Host ('  ' + $Title + ' ' + ('-' * [Math]::Max(3, 52 - $Title.Length))) -ForegroundColor DarkCyan
 }
 
 function Test-FullLanguageMode {
@@ -222,7 +405,7 @@ function Test-FullLanguageMode {
     }
     try { [void][System.AppDomain]::CurrentDomain.GetAssemblies(); [void][System.Math]::Sqrt(144) }
     catch {
-        Write-Host "Hata: $($_.Exception.Message)" -ForegroundColor Red
+        
         Write-Host 'Cozum: https://massgrave.dev/in-place_repair_upgrade' -ForegroundColor White -BackgroundColor Blue
         return $false
     }
@@ -239,7 +422,7 @@ function Warn-AV {
     }
 }
 
-# --- indirme: gercek yuzde barı + saniye sayaci (chunked, senkron garantili) ---
+
 function Write-DlBar([long]$Done, [long]$Total, $Sw) {
     $ratio = if ($Total -gt 0) { [math]::Min(1.0, $Done / $Total) } else { 0.0 }
     $pct = [int]([math]::Round($ratio * 100))
@@ -251,8 +434,8 @@ function Write-DlBar([long]$Done, [long]$Total, $Sw) {
     Write-Host ("`r  [{0}] {1,3}%  {2,3}s" -f $track, $pct, $el) -NoNewline
 }
 
-# Yuzdesi bilinmeyen ama uzun suren adimlar (ODT ayiklama, Office kurulumu) icin kayan cubuk.
-# Indirme gibi toplami bilinen isler Write-DlBar'in gercek yuzdesini kullanir; bu onun tamamlayicisi.
+
+
 function Write-BusyBar([int]$Tick, [int]$Width = 30, $Sw) {
     $pos = $Tick % ($Width * 2)
     if ($pos -ge $Width) { $pos = ($Width * 2) - $pos - 1 }
@@ -261,7 +444,7 @@ function Write-BusyBar([int]$Tick, [int]$Width = 30, $Sw) {
     Write-Host ("`r  [{0}] {1,4}s" -f $track, $el) -NoNewline
 }
 
-# Kosul saglanana kadar cubugu canli tutar. $MaxSec asilirsa durur ve $false doner (sonsuz asilma yok).
+
 function Wait-WithBar([scriptblock]$IsDone, [int]$MaxSec = 1800) {
     $sw = [Diagnostics.Stopwatch]::StartNew()
     $tick = 0
@@ -279,7 +462,7 @@ function Wait-WithBar([scriptblock]$IsDone, [int]$MaxSec = 1800) {
 }
 
 function Invoke-Download([string]$Url, [string]$OutFile) {
-    # chunked stream okuma — WebClient event'leri senkron cagrida calismaz, bu calisir
+    # Chunked stream read: WebClient events do not fire during a synchronous call, this does
     $req = [Net.HttpWebRequest]::Create($Url)
     $req.Method = 'GET'
     $req.Timeout = 60000
@@ -344,13 +527,80 @@ function Test-Hash([string]$Text, [string]$Expected) {
     (Get-Sha256 $Text) -eq $Expected
 }
 
-# Aktivasyon motorunun kaynagi. Sirasi:
-#   1) Upstream'in kendi bootstrap'i (get.activated.win) — commit + hash oradan okunur, boylece
-#      uygulama guncellenmese bile motor her zaman guncel kalir.
+function Get-FileSha256([string]$Path) {
+    ([BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash([IO.File]::ReadAllBytes($Path))) -replace '-')
+}
+
+# A usable ODT is big enough AND starts with the PE magic "MZ" — a size check alone would accept any
+# large file (an HTML error page saved to disk, a truncated download, a captive-portal response).
+function Test-OdtFile([string]$Path) {
+    try {
+        if (-not (Test-Path $Path)) { return $false }
+        if ((Get-Item $Path).Length -lt $OdtMinBytes) { return $false }
+        $fs = [IO.File]::OpenRead($Path)
+        try { $b = New-Object byte[] 2; [void]$fs.Read($b, 0, 2) } finally { $fs.Close() }
+        ($b[0] -eq 0x4D -and $b[1] -eq 0x5A)
+    } catch { $false }
+}
+
+# Office Deployment Tool acquisition — Microsoft's own downloader, four tiers, each verified before use:
+#   1) resources/ next to this script (only when running from a repo checkout)
+#   2) Microsoft's download page, scraped (Microsoft's documented route; the URL changes per build)
+#   3) the pinned Microsoft URL (survives a redesigned download page); hash-checked
+#   4) our GitHub release mirror (survives a blocked download.microsoft.com); hash-checked
+# Tiers 3 and 4 are the same build, so one hash covers both.
+function Get-OdtTool([string]$OutFile) {
+    $local = $null
+    if ($PSScriptRoot) {
+        $local = Get-ChildItem -Path (Join-Path $PSScriptRoot 'resources') -Filter 'officedeploymenttool*.exe' -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+    }
+    if ($local) {
+        Write-Host ((T 'odt_local') -f $local.Name) -ForegroundColor DarkGray
+        try { Copy-Item $local.FullName $OutFile -Force } catch { }
+        if (Test-OdtFile $OutFile) { Write-Host ((T 'odt_verify') -f $local.Name, ((Get-Item $OutFile).Length / 1MB)) -ForegroundColor DarkGreen; return $true }
+        Write-Host (T 'odt_small') -ForegroundColor DarkYellow
+    }
+
+    $candidates = @()
+    try {
+        Write-Host (T 'odt_dl') -ForegroundColor DarkGray
+        $conf = Invoke-WebRequest -Uri 'https://www.microsoft.com/en-us/download/details.aspx?id=49117' -UseBasicParsing -TimeoutSec 60
+        # CultureInvariant is required: under tr-TR a plain IgnoreCase match misses upper-case "I".
+        $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [Text.RegularExpressions.RegexOptions]::CultureInvariant).Value
+        if ($link) { $candidates += @{ Url = $link; Label = 'microsoft.com'; Hash = '' } }
+        else { Write-Host (T 'odt_pinned') -ForegroundColor DarkYellow }
+    } catch {
+        Write-Host (T 'odt_pinned') -ForegroundColor DarkYellow
+    }
+    $candidates += @{ Url = $OdtPinnedUrl; Label = 'microsoft.com pinned'; Hash = $OdtPinnedHash }
+    $candidates += @{ Url = $OdtMirrorUrl; Label = 'github mirror'; Hash = $OdtPinnedHash }
+
+    foreach ($c in $candidates) {
+        if ($c.Label -eq 'github mirror') { Write-Host (T 'odt_mirror') -ForegroundColor DarkYellow }
+        Remove-Item -Path $OutFile -Force -ErrorAction SilentlyContinue
+        try { Save-File -Url $c.Url -OutFile $OutFile } catch { }
+        if (-not (Test-OdtFile $OutFile)) {
+            Write-Host ("{0} ({1})" -f (T 'odt_small'), $c.Label) -ForegroundColor DarkYellow
+            continue
+        }
+        if ($c.Hash -and (Get-FileSha256 $OutFile) -ne $c.Hash) {
+            Write-Host ((T 'odt_hash_fail') -f $c.Label) -ForegroundColor DarkYellow
+            continue
+        }
+        Write-Host ((T 'odt_verify') -f $c.Label, ((Get-Item $OutFile).Length / 1MB)) -ForegroundColor DarkGreen
+        return $true
+    }
+    $false
+}
+
+
+
+
 #   2) Gomulu pin (commit + hash) — upstream'in formati degisirse bile calisir.
-#   3) Yerel onbellek — ag/upstream tamamen bozulsa bile son dogrulanmis kopya kullanilir.
+
 function Resolve-Engine {
-    # 1) upstream bootstrap -> guncel commit + hash
+    
     try {
         $boot = Get-WebString 'https://get.activated.win'
         if ($boot) {
@@ -373,7 +623,7 @@ function Resolve-Engine {
         }
     } catch { }
 
-    # 2) gomulu pin
+    
     $urls = @(
         "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$Pinned/MAS/All-In-One-Version-KL/MAS_AIO.cmd",
         "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/All-In-One-Version-KL/MAS_AIO.cmd&versionType=Commit&version=$Pinned",
@@ -385,7 +635,7 @@ function Resolve-Engine {
         return @{ Text = $aio; Source = 'pin'; Commit = $Pinned }
     }
 
-    # 3) yerel onbellek (son dogrulanmis kopya) — icerik, kaydedilen hash ile yeniden dogrulanir
+    
     $cached = Read-Cache $AioCache $AioCacheHash
     if ($cached) {
         Write-Host (T 'using_cache') -ForegroundColor Yellow
@@ -404,7 +654,7 @@ function Save-Cache([string]$Text, [string]$Path, [string]$HashPath) {
     } catch { }
 }
 
-# Yerel kurcalama/bozulmayi yakalar: icerik, kaydedildigi andaki hash ile uyusmazsa onbellek reddedilir.
+
 function Read-Cache([string]$Path, [string]$HashPath) {
     try {
         if (-not (Test-Path $Path)) { return $null }
@@ -418,29 +668,29 @@ function Read-Cache([string]$Path, [string]$HashPath) {
     $null
 }
 
-# Aktivasyon ciktisindan kullaniciya gosterilecek satirlar.
-# Metot/marka adlari (motorun kendi adi, kaynak adresleri, lisans metinleri) filtrelenir.
-# Filtre (tek kaynak): kullaniciya gosterilecek satirlari secer. Sonuc/uyari satirlari kalir;
-# metot/marka adlari, yontem secim metinleri, kaynak adresleri, lisans metinleri ve cmd komut
-# yankilari dusurulur. `-SelfTest` bu fonksiyonu aynen test eder.
+
+
+
+
+
 function Get-ResultLines([string]$Text) {
     if (-not $Text) { return @() }
-    # ANSI renk kodlarini temizle
+    
     $t = [regex]::Replace($Text, '\x1B\[[0-9;?]*[A-Za-z]', '')
     $t = [regex]::Replace($t, '\x1B[()][0-9A-B]', '')
     $skip = '(?i)ohook|tsforge|kms38|kms4k|kms4|staticcid|zerocid|scid|zcid|\bkms\b|hwid|massgrave|microsoft activation scripts|\bmas\b|activated\.win|github\.com|licence:|license:|gpl|_aio|plugin|switching to|method is not supported|choose a|select a|^\s*\[[0-9]\]'
     $keep = '(?i)licens|activ|success|fail|error|tamamlan|etkin|windows|office|expire|product key'
     @($t -split "`r?`n" |
         ForEach-Object { $_.Trim() } |
-        # cmd'nin ekrana bastigi komut satirlari (AW_<guid>.cmd> echo ...) kullaniciya cikmasin
+        
         Where-Object { $_ -and -not (Test-Match $_ '^[A-Za-z]:\\[^\r\n]*AW_[0-9a-f\-]{36}\.cmd>') -and -not (Test-Match $_ '^\s*>\s') } |
         Where-Object { $_ -and -not (Test-Match $_ $skip) -and (Test-Match $_ $keep) })
 }
 
 function Show-ActivationResult([string]$LogPath) {
     if (-not $LogPath -or -not (Test-Path $LogPath)) { return $false }
-    # Surec zorla sonlandirildiginda gunlugun yazma tutucusu hala kapanmis olmayabilir;
-    # o zaman ReadAllText IOException firlatir (içerik aslinda orada). Paylasimli ac + kisa tekrar.
+    
+    
     $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
     $txt = $null
     for ($i = 0; $i -lt 30; $i++) {
@@ -466,7 +716,7 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
     $tmp = if ($isAdmin) { "$env:SystemRoot\Temp" } else { "$env:USERPROFILE\AppData\Local\Temp" }
     $file = "$tmp\AW_$rand.cmd"
     $log = "$tmp\AW_$rand.log"
-    # ilk satirdaki @::: guidi cmd'nin -el ile kendi kendine yeniden calistirmasinda ilk satiri etkisizler
+    
     Set-Content -Path $file -Value "@::: $rand`r`n$Response"
     if (-not (Test-Path $file)) { Warn-AV; Write-Host ((T 'tmp_fail') -f $Label) -ForegroundColor Red; return }
     $env:ComSpec = "$env:SystemRoot\system32\cmd.exe"
@@ -481,20 +731,20 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
     if ($hidden) { $sp['WindowStyle'] = 'Hidden' } else { $sp['Wait'] = $true }
     try {
         if ($hidden) {
-            # Motor bazi akislarda sonda tus bekler (or. durum kontrolu `choice /c 0 /n`).
-            # Gizli pencerede tus bekleyen surec sonsuza kadar asili kalir; bu yuzden sinirli bekle:
-            # cikti zaten gecici gunluge yazilmis olur, sonra surec sonlandirilir.
-            # Motorun kendi penceresi gizli oldugu icin tek geri bildirim bu cubuktur.
+            
+            
+            
+            
             $p = Start-Process @sp
             if (-not (Wait-WithBar { $p.WaitForExit(200) } $HiddenTimeoutSec)) {
-                # Stop-Process yalnizca cmd.exe'yi oldurur; motor (ve onun timeout/choice cocuklari)
-                # yasamaya devam eder -> gizli yetim surecler. /T ile tum agac kapatilir.
+                
+                
                 & "$env:SystemRoot\system32\taskkill.exe" /PID $p.Id /T /F 2>&1 | Out-Null
                 Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
                 Write-Host ((T 'act_timeout') -f $HiddenTimeoutSec) -ForegroundColor DarkYellow
             }
             if (-not (Show-ActivationResult $log)) {
-                # filtre hicbir satir birakmadi: "hic cikti yok" ile "basarisiz" ayni gorunmesin
+                
                 Write-Host (T 'act_nolog') -ForegroundColor DarkGray
             }
         } else {
@@ -504,8 +754,8 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
     } catch {
         Write-Host ((T 'uac_cancel2') -f $Label) -ForegroundColor Yellow
     } finally {
-        # Surec yeni oldugunde handle'lar hemen birakilmaz; tek denemeli silme sessizce basarisiz olur
-        # ve motorun tam kopyasini iceren .cmd gecici klasorde kalir. Kisa yeniden deneme.
+        
+        
         foreach ($f in @($file, $log)) {
             for ($i = 0; $i -lt 10 -and (Test-Path $f); $i++) {
                 Remove-Item -Path $f -Force -ErrorAction SilentlyContinue
@@ -519,10 +769,10 @@ function Invoke-MasAio([string]$Arguments = '') {
     $eng = Resolve-Engine
     if (-not $eng) { return }
     if ($Arguments) {
-        # metot cagrilari: pencere acilmaz, sonuc kendi filtremizden gecer
+        
         Invoke-MasCmd -Response $eng.Text -Arguments $Arguments -Label $Arguments.Trim('/')
     } else {
-        # tam menu kullanicinin etkilesimi icin gorunur olmak zorunda
+        
         Invoke-MasCmd -Response $eng.Text -Arguments '' -Label 'menu' -Visible
     }
 }
@@ -559,7 +809,7 @@ function Default-OfficeLang {
     else { $c }
 }
 
-# Hicbir bilesen onceden secili gelmez; kullanici kendi secer.
+
 function New-AppSelection {
     $sel = @{}
     foreach ($a in $OfficeApps) { $sel[$a.id] = $false }
@@ -596,13 +846,14 @@ function Select-OfficeApps {
     $sel = New-AppSelection
     while ($true) {
         Show-AppPicker $sel
-        $in = Read-Host (T 'app_sel')
-        if (-not $in) { break }
-        $low = $in.Trim().ToLowerInvariant()
+        $r = Read-Input (T 'app_sel')
+        if ($r.Back) { return $null }
+        if (-not $r.Text) { break }
+        $low = $r.Text.Trim().ToLowerInvariant()
         if ($low -eq 'a') { foreach ($a in $OfficeApps) { $sel[$a.id] = $true }; continue }
         if ($low -eq 'n') { foreach ($a in $OfficeApps) { $sel[$a.id] = $false }; continue }
         if ($low -eq 'r') { foreach ($a in $OfficeApps) { $sel[$a.id] = ($OfficeAppsRecommended -contains $a.id) }; continue }
-        foreach ($part in ($in -split ',')) {
+        foreach ($part in ($r.Text -split ',')) {
             $p = $part.Trim()
             if ($p -match '^\d+$') {
                 $idx = [int]$p - 1
@@ -637,20 +888,21 @@ function Resolve-OfficeLang {
     $def = Default-OfficeLang
     while ($true) {
         Show-LangList
-        $in = Read-Host ((T 'olang') -f $def)
-        if (-not $in) { return $def }
-        if ($in -match '^\d+$') {
-            $n = [int]$in
+        $r = Read-Input ((T 'olang') -f $def)
+        if ($r.Back) { return $null }
+        if (-not $r.Text) { return $def }
+        if ($r.Text -match '^\d+$') {
+            $n = [int]$r.Text
             if ($n -ge 1 -and $n -le $OfficeLangs.Count) {
                 $code = $OfficeLangs[$n - 1]
-                $ans = Read-Host ((T 'olang_confirm') -f $n, $code)
-                if ($ans -eq '0') { continue }
+                $c = Read-Input ((T 'olang_confirm') -f $n, $code)
+                if ($c.Back -or $c.Text -eq '0') { continue }
                 return $code
             }
             Write-Host (T 'invalid_lang') -ForegroundColor Red
             continue
         }
-        if (Test-Match $in '^[a-z]{2}(-[a-z0-9]{2,8})?$') { return $in.ToLowerInvariant() }
+        if (Test-Match $r.Text '^[a-z]{2}(-[a-z0-9]{2,8})?$') { return $r.Text.ToLowerInvariant() }
         Write-Host (T 'invalid_lang') -ForegroundColor Red
     }
 }
@@ -684,67 +936,76 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host '   Office LTSC Professional Plus 2024' -ForegroundColor Cyan
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
-    # Dil once, mod sonra: dil yapilandirmanin parcasi, kurulum kapsamindan bagimsiz secilir.
-    $lang = Resolve-OfficeLang
-    Write-Host ''
-    Write-Host ('  ' + (T 'mode_head')) -ForegroundColor Yellow
-    Write-Host (T 'mode_h') -ForegroundColor Gray
-    Write-Host (T 'mode_t') -ForegroundColor Gray
-    Write-Host (T 'mode_c') -ForegroundColor Gray
-    Write-Host ''
-    $mode = Read-Host (T 'sel12')
+    Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
+    $script:WorkDir = $work   # so a cancelled run (closed input / Ctrl+C) can still clean up
     New-Item -ItemType Directory -Path $work -Force | Out-Null
     $odt = Join-Path $work 'odt.exe'
 
-    # 1) repo icindeki yerel kopya (script dosyasiyla birlikte calisirken)
-    $local = $null
-    if ($PSScriptRoot) {
-        $local = Get-ChildItem -Path (Join-Path $PSScriptRoot 'resources') -Filter 'officedeploymenttool*.exe' -ErrorAction SilentlyContinue | Select-Object -First 1
-    }
-    if ($local) {
-        Write-Host ((T 'odt_local') -f $local.Name) -ForegroundColor DarkGray
-        Copy-Item $local.FullName $odt
-    } else {
-        # 2) MS indirme sayfasindan dogrudan .exe linki (aka.ms/odt artik sadece dokumantasyona gider)
-        Write-Host (T 'odt_dl') -ForegroundColor DarkGray
-        try {
-            $conf = Invoke-WebRequest -Uri 'https://www.microsoft.com/en-us/download/details.aspx?id=49117' -UseBasicParsing
-            # CultureInvariant sart: tr-TR'de 'I' != 'i', yani düz 'IgnoreCase' buyuk harfli linki kacirir.
-            $link = [regex]::Match($conf.Content, 'https://download\.microsoft\.com/[^"''\s<>]*officedeploymenttool[^"''\s<>]*\.exe', [Text.RegularExpressions.RegexOptions]::IgnoreCase -bor [Text.RegularExpressions.RegexOptions]::CultureInvariant).Value
-            if (-not $link) { throw 'download link not found on page' }
-            Save-File -Url $link -OutFile $odt
-        } catch {
-            Write-Host ((T 'odt_fail') -f $_.Exception.Message) -ForegroundColor Red
-            Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-            return
+    # 1) Get the tool and unpack it BEFORE asking anything: the download is the slow part and the
+    #    questions are pointless if it cannot be obtained. On Esc the loop restarts but keeps the
+    #    already-verified tool, so a cancelled run never re-downloads.
+    while ($true) {
+        if (-not (Test-OdtFile $odt)) {
+            if (-not (Get-OdtTool -OutFile $odt)) {
+                Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                return
+            }
         }
-    }
-    if ((Get-Item $odt).Length -lt 2MB) { Write-Host (T 'odt_small') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
+        $setup = Join-Path $work 'setup.exe'
+        if (-not (Test-Path $setup)) {
+            Write-Host (T 'extract') -ForegroundColor Cyan
+            $px = Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -PassThru -WindowStyle Hidden
+            if (-not (Wait-WithBar { $px.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+        }
+        if (-not (Test-Path $setup)) {
+            Write-Host (T 'extract_fail') -ForegroundColor Red
+            Remove-Item -Path $odt -Force -ErrorAction SilentlyContinue   # likely a broken download: refetch once
+            continue
+        }
 
-    # bilesen secimi → ExcludeApp listesi
-    if ($mode -eq '3') {
-        $chosen = @(Select-OfficeApps)
-        $chosenIds = $chosen | ForEach-Object { $_.id }
-        $excludeIds = $OfficeApps | ForEach-Object { $_.id } | Where-Object { $chosenIds -notcontains $_ }
-    } elseif ($mode -eq '2') {
-        $excludeIds = @()
-    } else {
-        $excludeIds = @('Access', 'Lync', 'OneDrive', 'OneNote', 'Outlook', 'Publisher')
-    }
+        # 2) Now the questions.
+        Write-Host ''
+        Write-Host ('  ' + (T 'off_ready')) -ForegroundColor Cyan
+        $lang = Resolve-OfficeLang
+        if ($null -eq $lang) { continue }
 
-    Write-Host (T 'extract') -ForegroundColor Cyan
-    $px = Start-Process -FilePath $odt -ArgumentList "/extract:`"$work`" /quiet" -PassThru -WindowStyle Hidden
-    if (-not (Wait-WithBar { $px.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
-    $setup = Join-Path $work 'setup.exe'
-    if (-not (Test-Path $setup)) { Write-Host (T 'extract_fail') -ForegroundColor Red; Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue; return }
+        Write-Host ''
+        Write-Host ('  ' + (T 'mode_head')) -ForegroundColor Yellow
+        Write-Host (T 'mode_h') -ForegroundColor Gray
+        Write-Host (T 'mode_t') -ForegroundColor Gray
+        Write-Host (T 'mode_c') -ForegroundColor Gray
+        Write-Host ''
+        $r = Read-Input ((T 'sel12') + '   ' + (T 'esc_hint'))
+        if ($r.Back) { continue }
+        $mode = $r.Text.Trim()
+
+        if ($mode -eq '3') {
+            $chosen = @(Select-OfficeApps)
+            if (-not $chosen) { continue }
+            $chosenIds = $chosen | ForEach-Object { $_.id }
+            $excludeIds = $OfficeApps | ForEach-Object { $_.id } | Where-Object { $chosenIds -notcontains $_ }
+            $chosenNames = ($chosen | ForEach-Object { $_.n }) -join ', '
+        } elseif ($mode -eq '2') {
+            $excludeIds = @()
+            $chosenNames = ($OfficeApps | ForEach-Object { $_.n }) -join ', '
+        } else {
+            $excludeIds = @('Access', 'Lync', 'OneDrive', 'OneNote', 'Outlook', 'Publisher')
+            $chosenNames = ($OfficeApps | Where-Object { $OfficeAppsRecommended -contains $_.id } | ForEach-Object { $_.n }) -join ', '
+        }
+
+        Write-Host ''
+        Write-Host ('  ' + ((T 'off_summary') -f $lang, $chosenNames)) -ForegroundColor Green
+        if (-not (Confirm (T 'off_go'))) { continue }
+        break
+    }
 
     $config = Get-OfficeConfigXml -Lang $lang -ExcludeIds $excludeIds
     $configPath = Join-Path $work 'Configuration.xml'
     [IO.File]::WriteAllText($configPath, $config)
 
-    $isAdmin = [bool]([Security.Principal.WindowsIdentity]::GetCurrent().Groups -match 'S-1-5-32-544')
+    $isAdmin = Test-Admin
     $rcFile = Join-Path $work 'rc.txt'
     $rc = $null
     try {
@@ -754,8 +1015,8 @@ function Install-OfficeLTSC {
             if (-not (Wait-WithBar { $p.HasExited } 3600)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
             $rc = $p.ExitCode
         } else {
-            # Yukseletilen cocuk surec kendi cikis kodunu yazar. Aksi halde kurulum basarisiz olsa bile
-            # 'basarili' gorunurdu (eski hata). Cubuk, cikis kodu dosyasi olusana kadar canli kalir.
+            
+            
             Write-Host (T 'inst_uac') -ForegroundColor Cyan
             $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$configPath'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII"
             if (-not (Wait-WithBar { (Test-Path $rcFile) -or $p.HasExited } 3600)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
@@ -779,14 +1040,16 @@ function Install-OfficeLTSC {
     }
 }
 
+# Windows 10 is build < 22000; only there is the ESU method relevant. Uses the cached registry read
+# instead of a WMI query, because this runs on the [7]/[8] path too.
 function Test-Win10 {
-    try { [int](Get-CimInstance Win32_OperatingSystem -ErrorAction Stop).BuildNumber -lt 22000 }
-    catch { $false }
+    $wi = Get-WinInfo
+    ($wi.Build -gt 0 -and $wi.Build -lt 22000)
 }
 
-# [7] HEPSINI ETKINLESTIR — sadece etkinlestirme, kurulum yok.
-# Windows: kalici dijital lisans (guncellemelerden etkilenmez). Office: kalici. Win10'da ESU da.
-# Argumanlar tek geciste ve sira bagimsiz gonderilir; motor hangi sirada olursa olsun hepsini isler.
+# [7] ACTIVATE EVERYTHING — activation only, no install.
+# Windows: permanent digital license (survives updates). Office: permanent. Plus ESU on Windows 10.
+# Arguments go in a single order-independent pass; the engine handles them in any order.
 function Invoke-AllActivate {
     Write-Host ''
     Write-Host (T 'act_start') -ForegroundColor Magenta
@@ -797,7 +1060,7 @@ function Invoke-AllActivate {
     Invoke-MasCheck
 }
 
-# [8] HEPSINI YAP — eksikse Office kur, sonra [7] akisini calistir, en son tam MAS menusunu teklif et.
+# [8] DO EVERYTHING — install Office when missing, then the [7] flow, then offer the full engine menu.
 function Invoke-AllInOne {
     Write-Host ''
     Write-Host (T 'all_start') -ForegroundColor Magenta
@@ -809,37 +1072,108 @@ function Invoke-AllInOne {
     Write-Host (T 'all_done') -ForegroundColor Green
 }
 
+# The language selector accepts the same letters the header advertises ([A]/[T]/[E]) and 1/2/3.
 function Set-UiLang {
     Write-Host ''
     Write-Host ((T 'langpick') -f ((Get-Culture).Name)) -ForegroundColor Cyan
-    $c = Read-Host '>>'
-    switch ($c) {
+    $r = Read-Input ((T 'choice') + ' (A/T/E)')
+    if ($r.Back) { return }
+    switch ($r.Text.Trim().ToLowerInvariant()) {
         '1' { $script:UiLang = 'auto' }
         '2' { $script:UiLang = 'tr' }
         '3' { $script:UiLang = 'en' }
+        'a' { $script:UiLang = 'auto' }
+        't' { $script:UiLang = 'tr' }
+        'e' { $script:UiLang = 'en' }
     }
+    $script:WinInfo = $null   # the summary line is translated, so rebuild it in the new language
 }
 
-function Show-Menu {
+# [9] About — version, author, license, and where the engine comes from.
+function Show-About {
     Clear-Host
     Write-Banner
     Write-Host ''
-    Write-Host ((T 'langline') -f ((Get-Culture).Name)) -ForegroundColor DarkCyan
+    Write-Host ('  ' + (T 'about_head')) -ForegroundColor Cyan
+    Write-Host ('  ' + ((T 'about_ver') -f $Version)) -ForegroundColor Gray
+    Write-Host ('  ' + ((T 'about_by') -f $Author)) -ForegroundColor Green
+    Write-Host ('  ' + (T 'about_lic')) -ForegroundColor Gray
+    Write-Host ('  ' + ((T 'about_site') -f $SiteUrl)) -ForegroundColor Gray
+    Write-Host ('  ' + ((T 'about_repo') -f $RepoUrl)) -ForegroundColor Gray
+    Write-Host ('  ' + ((T 'about_short') -f $ShortUrl)) -ForegroundColor Gray
     Write-Host ''
-    Write-Host (T 'm1') -ForegroundColor White
-    Write-Host (T 'm2') -ForegroundColor White
-    Write-Host (T 'm3') -ForegroundColor White
-    Write-Host (T 'm4') -ForegroundColor White
-    Write-Host (T 'm5') -ForegroundColor White
-    Write-Host (T 'm6') -ForegroundColor Cyan
-    Write-Host (T 'm7') -ForegroundColor Magenta
-    Write-Host (T 'm8') -ForegroundColor Magenta
-    Write-Host (T 'mx') -ForegroundColor DarkGray
-    Write-Host (T 'ml') -ForegroundColor DarkGray
+    Write-Host ('  ' + (T 'about_note')) -ForegroundColor DarkGray
     Write-Host ''
-    $choice = Read-Host (T 'choice')
-    switch ($choice) {
-        '1' { Invoke-MasAio '/HWID' }
+    [void](Read-Input '')
+}
+
+# Edition change. The engine's own changer holds the product-key logic per edition and its own
+# verified list, so it is delegated to (in a visible window, because it needs interactive input).
+# Reimplementing that here would risk putting the machine on a wrong edition.
+function Invoke-ChangeEdition {
+    $eds = Get-EditionList
+    Write-Host ''
+    if ($eds.Count) {
+        Write-Host ('  ' + ((T 'win_eds') -f $eds.Count)) -ForegroundColor Cyan
+        for ($i = 0; $i -lt $eds.Count; $i++) {
+            Write-Host ('    {0,2}) {1}' -f ($i + 1), $eds[$i]) -ForegroundColor Gray
+        }
+    } else {
+        Write-Host ('  ' + (T 'win_eds_none')) -ForegroundColor DarkYellow
+    }
+    Write-Host ('  ' + (T 'win_eds_note')) -ForegroundColor DarkGray
+    Write-Host ''
+    if (-not (Confirm (T 'win_change_ask_go'))) { return }
+
+    $eng = Resolve-Engine
+    if (-not $eng) { return }
+    # Same commit as the already verified engine, so the companion file is anchored to that commit.
+    $urls = @(
+        "https://raw.githubusercontent.com/massgravel/Microsoft-Activation-Scripts/$($eng.Commit)/MAS/Separate-Files-Version/Change_Windows_Edition.cmd",
+        "https://dev.azure.com/massgrave/Microsoft-Activation-Scripts/_apis/git/repositories/Microsoft-Activation-Scripts/items?path=/MAS/Separate-Files-Version/Change_Windows_Edition.cmd&versionType=Commit&version=$($eng.Commit)"
+    )
+    $ce = Get-String $urls (T 'ce_dl')
+    if (-not $ce -or -not (Test-Match $ce ':cedmenu2')) {
+        Write-Host (T 'ce_fail') -ForegroundColor Red
+        return
+    }
+    Write-Host (T 'win_change_go') -ForegroundColor Yellow
+    Invoke-MasCmd -Response $ce -Arguments '' -Label 'edition' -Visible
+    if (Confirm (T 'win_change_ask')) { Invoke-MasAio '/HWID' }
+}
+
+# [1] Windows. A submenu, because "activate Windows" and "change which edition I am on, then
+# activate" are different jobs and the second one needs to show what this build can serve.
+function Invoke-WindowsMenu {
+    while ($true) {
+        $wi = Get-WinInfo
+        Clear-Host
+        Write-Banner
+        Write-Host ''
+        Write-Host ('  ' + (T 'win_head')) -ForegroundColor Cyan
+        Write-Host ('  ' + ((T 'win_cur') -f $wi.Edition, $wi.Build, $wi.Summary)) -ForegroundColor DarkGray
+        Write-Host (T 'win_a1') -ForegroundColor White
+        Write-Host (T 'win_a2') -ForegroundColor White
+        Write-Host (T 'win_a3') -ForegroundColor White
+        Write-Host ''
+        Write-Host (T 'm0back') -ForegroundColor DarkGray
+        Write-Host ('  ' + (T 'esc_hint')) -ForegroundColor DarkGray
+        Write-Host ''
+        $r = Read-Input (T 'choice')
+        if ($r.Back -or -not $r.Text) { return }
+        switch ($r.Text.Trim()) {
+            '1' { Invoke-MasAio '/HWID'; return }
+            '2' { Invoke-ChangeEdition }
+            '3' { Invoke-MasAio '/Z-ESU'; return }
+            '0' { return }
+        }
+    }
+}
+
+# One dispatch table keeps the menu text, the numbers and the actions in step.
+function Invoke-Action([string]$Key) {
+    switch ($Key) {
+        '1' { Invoke-WindowsMenu }
         '2' { Invoke-MasAio '/Ohook' }
         '3' { Invoke-MasAio '/Z-WindowsESUOffice' }
         '4' { Invoke-MasAio '/Z-ESU' }
@@ -847,25 +1181,61 @@ function Show-Menu {
         '6' { Install-OfficeLTSC }
         '7' { Invoke-AllActivate }
         '8' { Invoke-AllInOne }
-        '0' { return $true }
+        '9' { Show-About }
         'l' { Set-UiLang }
-        'L' { Set-UiLang }
-        'a' { $script:UiLang = 'auto' }
-        'A' { $script:UiLang = 'auto' }
-        't' { $script:UiLang = 'tr' }
-        'T' { $script:UiLang = 'tr' }
-        'e' { $script:UiLang = 'en' }
-        'E' { $script:UiLang = 'en' }
-        default { }
     }
-    if ($choice -ne '0') { Write-Host ''; Read-Host (T 'back') | Out-Null; Show-Menu }
 }
 
-# --- giris ---
+# The main screen. Grouped by task so the numbers stay familiar while the layout is readable.
+function Show-MainMenu {
+    Clear-Host
+    Write-Banner
+    $wi = Get-WinInfo
+    Write-Host ''
+    Write-Host ('  ' + ((T 'langline') -f (Get-Culture).Name)) -ForegroundColor DarkCyan
+    Write-Host ('  ' + $wi.Summary) -ForegroundColor DarkGray
+    Write-Section (T 'sec_win')
+    Write-Host (T 'm1') -ForegroundColor White
+    Write-Host (T 'm4') -ForegroundColor DarkGray
+    Write-Section (T 'sec_off')
+    Write-Host (T 'm2') -ForegroundColor White
+    Write-Host (T 'm6') -ForegroundColor Cyan
+    Write-Section (T 'sec_all')
+    Write-Host (T 'm3') -ForegroundColor White
+    Write-Host (T 'm7') -ForegroundColor Magenta
+    Write-Host (T 'm8') -ForegroundColor Magenta
+    Write-Section (T 'sec_info')
+    Write-Host (T 'm5') -ForegroundColor White
+    Write-Host (T 'm9') -ForegroundColor White
+    Write-Host ''
+    Write-Host (T 'mx') -ForegroundColor DarkGray
+    Write-Host (T 'ml') -ForegroundColor DarkGray
+    Write-Host ('  ' + (T 'esc_hint')) -ForegroundColor DarkGray
+}
+
+# Main loop. Iterative, not recursive: every action returns here, and Esc inside a submenu just
+# lands back here — no need to restart the app after a wrong pick.
+function Invoke-Main {
+    while ($true) {
+        Show-MainMenu
+        $r = Read-Input (T 'choice')
+        if ($r.Back) { continue }
+        $k = $r.Text.Trim().ToLowerInvariant()
+        if (-not $k) { continue }
+        if ($k -eq '0') { return }
+        Invoke-Action $k
+        if ($k -ne '9') {
+            Write-Host ''
+            [void](Read-Input (T 'back'))
+        }
+    }
+}
+
+
 if (-not (Test-FullLanguageMode)) { return }
 
-# Yerlesik kontroller: ag/kurulum/yetki gerektirmez. Ince davranislari (ozellikle
-# Turkce kulturde buyuk harfli metin eslesmesini) her surumde dogrular.
+
+
 if ($args -contains '-SelfTest') {
     $fail = 0
     function Assert([string]$Name, [bool]$Ok) {
@@ -875,14 +1245,14 @@ if ($args -contains '-SelfTest') {
     Write-Host 'SelfTest' -ForegroundColor Cyan
     Write-Host ("  culture: " + (Get-Culture).Name)
 
-    # Turkce 'I' != 'i' tuzagi: bu satir duz -match ile gecmez, Test-Match ile gecmeli
-    Assert 'Test-Match buyuk harf (HWID)' (Test-Match 'HWID is here' 'hwid')
-    Assert 'Test-Match buyuk harf (OHOOK)' (Test-Match 'OHOOK' 'ohook')
-    Assert 'Test-Match buyuk harf (LICENSED)' (Test-Match 'Windows LICENSED' 'licens')
-    Assert 'Test-Match olumsuz' (-not (Test-Match 'nothing here' 'hwid'))
+    
+    Assert 'Test-Match upper case (HWID)' (Test-Match 'HWID is here' 'hwid')
+    Assert 'Test-Match upper case (OHOOK)' (Test-Match 'OHOOK' 'ohook')
+    Assert 'Test-Match upper case (LICENSED)' (Test-Match 'Windows LICENSED' 'licens')
+    Assert 'Test-Match negative' (-not (Test-Match 'nothing here' 'hwid'))
 
-    # cikti filtresi — GERCEK fonksiyon (Get-ResultLines) test edilir, kopya degil:
-    # metot adlari sizmamali, sonuc/uyari satirlari kalmali
+    
+    
     $engineOut = @(
         'Ohook Activation v3.0',
         'TSforge Activation',
@@ -903,50 +1273,111 @@ if ($args -contains '-SelfTest') {
     $kept = @(Get-ResultLines ($engineOut -join "`r`n"))
     $joined = $kept -join "`n"
     $leaky = @($kept | Where-Object { Test-Match $_ 'ohook|tsforge|hwid|kms|staticcid|zerocid|microsoft activation|massgrave|activated\.win|github\.com|^\s*\[[0-9]\]|AW_11111' })
-    Assert ("filtre: metot/yontem adlari duser" + $(if ($leaky) { " -> " + ($leaky -join ' | ') } else { '' })) ($leaky.Count -eq 0)
-    Assert 'filtre: LICENSED kalir'      (Test-Match $joined 'is LICENSED')
-    Assert 'filtre: activated kalir'     (Test-Match $joined 'is activated')
-    Assert 'filtre: ERROR kalir'         (Test-Match $joined 'ERROR: something went wrong')
-    Assert 'filtre: cmd yankisi duser'   (-not (Test-Match $joined 'echo installing'))
-    Assert 'filtre: bom bos cikti'       (-not [bool]@(Get-ResultLines '').Count)
+    Assert ("filter: no method names leak" + $(if ($leaky) { " -> " + ($leaky -join ' | ') } else { '' })) ($leaky.Count -eq 0)
+    Assert 'filter: LICENSED survives'      (Test-Match $joined 'is LICENSED')
+    Assert 'filter: activated survives'     (Test-Match $joined 'is activated')
+    Assert 'filter: ERROR survives'         (Test-Match $joined 'ERROR: something went wrong')
+    Assert 'filter: cmd echo dropped'   (-not (Test-Match $joined 'echo installing'))
+    Assert 'filter: empty stays empty'       (-not [bool]@(Get-ResultLines '').Count)
 
-    # gizli calistirma asilmasin diye zaman asimi tanimli ve makul
-    Assert 'gizli zaman asimi tanimli' ([int]$HiddenTimeoutSec -gt 60)
+    
+    Assert 'hidden timeout defined' ([int]$HiddenTimeoutSec -gt 60)
 
-    # Office kurulum yapilandirmasi: ODT gecersiz XML'de kurulumu reddeder -> her surumde dogrula.
+    
     $cfgTxt = Get-OfficeConfigXml -Lang 'tr-tr' -ExcludeIds @('Access', 'Outlook')
     $cfgXml = $null
     try { $cfgXml = [xml]$cfgTxt } catch { }
-    Assert 'office cfg: gecerli XML' ($null -ne $cfgXml)
+    Assert 'office cfg: valid XML' ($null -ne $cfgXml)
     if ($cfgXml) {
         $ns = $cfgXml.Configuration.Add.Product
-        Assert 'office cfg: dil dogru'    ($ns.Language.ID -eq 'tr-tr')
-        Assert ('office cfg: urun + kanal') ($ns.ID -eq 'ProPlus2024Volume' -and $cfgXml.Configuration.Add.Channel -eq 'PerpetualVL2024')
-        Assert ('office cfg: ExcludeApp sayisi 2') (@($ns.ExcludeApp).Count -eq 2)
-        Assert 'office cfg: otomatik etkinlestirme' (@($cfgXml.Configuration.Property | Where-Object { $_.Name -eq 'AUTOACTIVATE' }).Value -eq '1')
+        Assert 'office cfg: language correct'    ($ns.Language.ID -eq 'tr-tr')
+        Assert ('office cfg: product + channel') ($ns.ID -eq 'ProPlus2024Volume' -and $cfgXml.Configuration.Add.Channel -eq 'PerpetualVL2024')
+        Assert ('office cfg: ExcludeApp count 2') (@($ns.ExcludeApp).Count -eq 2)
+        Assert 'office cfg: auto-activate' (@($cfgXml.Configuration.Property | Where-Object { $_.Name -eq 'AUTOACTIVATE' }).Value -eq '1')
     }
-    Assert 'office cfg: hic dislama yoksa bos' (-not (Test-Match (Get-OfficeConfigXml '' @()) 'ExcludeApp'))
+    Assert 'office cfg: empty when nothing is excluded' (-not (Test-Match (Get-OfficeConfigXml '' @()) 'ExcludeApp'))
 
-    # Bilesen secimi: hicbiri onceden secili gelmemeli (regresyon: eskiden Word/Excel/PowerPoint secili geliyordu)
+    
     $dsel = New-AppSelection
-    Assert 'office secim: varsayilan bos' (@($dsel.Values | Where-Object { $_ }).Count -eq 0)
-    Assert 'office secim: 9 bilesen'     ($dsel.Keys.Count -eq 9)
-    Assert 'office mod metni W/E/P der'  (Test-Match (T 'mode_h') 'Word.*Excel.*PowerPoint')
-    Assert 'office ipucu onerilen seti'  (Test-Match (T 'app_hint') 'Word.*Excel.*PowerPoint')
+    Assert 'office selection: empty by default' (@($dsel.Values | Where-Object { $_ }).Count -eq 0)
+    Assert 'office selection: 9 components'     ($dsel.Keys.Count -eq 9)
+    Assert 'office mode text describes W/E/P'  (Test-Match (T 'mode_h') 'Word.*Excel.*PowerPoint')
+    Assert 'office hint lists the recommended set'  (Test-Match (T 'app_hint') 'Word.*Excel.*PowerPoint')
 
-    # Yuzdesiz adimlar icin canli cubuk: biteni hemen gecmeli, bitmeyeni zaman asiminda kesmeli
-    Assert 'busy bar: biteni bekler'        (Wait-WithBar { $true } 5)
+    
+    Assert 'busy bar: returns when done'        (Wait-WithBar { $true } 5)
     $swBar = [Diagnostics.Stopwatch]::StartNew()
     $barRes = Wait-WithBar { $false } 1
     $swBar.Stop()
-    Assert 'busy bar: zaman asiminda durur' ((-not $barRes) -and $swBar.Elapsed.TotalSeconds -lt 6)
+    Assert 'busy bar: stops on timeout' ((-not $barRes) -and $swBar.Elapsed.TotalSeconds -lt 6)
 
-    # TR/EN anahtar paritesi
+    # --- v2.3.0 additions ---
+
+    # Every key used through T '...' must exist in the dictionary; a typo would otherwise print an
+    # empty line at runtime and nobody would notice until a user does.
+    $srcText = ''
+    try { $srcText = [IO.File]::ReadAllText($PSCommandPath) } catch { }
+    if ($srcText) {
+        $usedKeys = @([regex]::Matches($srcText, "\bT '([a-z0-9_]+)'") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+        $missing = @($usedKeys | Where-Object { -not $Strings['tr'].ContainsKey($_) })
+        Assert ("i18n: no missing key" + $(if ($missing) { " -> " + ($missing -join ',') } else { '' })) ($missing.Count -eq 0)
+
+        # Only switches the engine actually documents may be passed to it; a typo would silently
+        # activate nothing while reporting success.
+        $knownSwitch = @('/HWID', '/Ohook', '/Z-ESU', '/Z-Windows', '/Z-Office', '/Z-WindowsESUOffice', '/Z-ProjectVisio', '/Z-WinHost', '/Z-OffHost', '/Z-APPX', '/K-WindowsOffice', '/S')
+        $usedSwitch = @([regex]::Matches($srcText, "Invoke-MasAio\s+'([^']+)'") | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+        $badSwitch = @($usedSwitch | Where-Object { $knownSwitch -notcontains $_ })
+        Assert ("engine: no unknown switch" + $(if ($badSwitch) { " -> " + ($badSwitch -join ',') } else { '' })) ($badSwitch.Count -eq 0)
+        Assert 'engine: at least one switch used' ($usedSwitch.Count -gt 0)
+    }
+
+    # Esc-as-back must work identically on the interactive path and the piped fallback.
+    Assert 'back token (esc)'      (Test-BackToken 'esc')
+    Assert 'back token (padded ESC)' (Test-BackToken '  ESC ')
+    Assert 'back token negative'    (-not (Test-BackToken 'escalate'))
+    Assert 'back token empty'        (-not (Test-BackToken ''))
+
+    # ODT acceptance must reject a small or non-PE file; a size-only check would accept both.
+    $f1 = [IO.Path]::GetTempFileName()
+    [IO.File]::WriteAllText($f1, 'not an executable')
+    Assert 'odt: small file rejected' (-not (Test-OdtFile $f1))
+    $f2 = [IO.Path]::GetTempFileName()
+    $fs = [IO.File]::Create($f2)
+    try { $fs.Write([byte[]](0x4D, 0x5A), 0, 2); $fs.SetLength(3MB) } finally { $fs.Close() }
+    Assert 'odt: PE + size accepted' (Test-OdtFile $f2)
+    $f3 = [IO.Path]::GetTempFileName()
+    $fs = [IO.File]::Create($f3)
+    try { $fs.Write([byte[]](0x3C, 0x68), 0, 2); $fs.SetLength(3MB) } finally { $fs.Close() }
+    Assert 'odt: non-PE rejected' (-not (Test-OdtFile $f3))
+    Remove-Item $f1, $f2, $f3 -Force -ErrorAction SilentlyContinue
+    Assert 'odt: missing file rejected' (-not (Test-OdtFile (Join-Path $env:TEMP 'AW_no_such_file.exe')))
+
+    # The fallback chain must point at Microsoft first and our mirror last, and the hash must be real.
+    Assert 'odt: pinned link is microsoft' (Test-Match $OdtPinnedUrl '^https://download\.microsoft\.com/')
+    Assert 'odt: backup link is github'    (Test-Match $OdtMirrorUrl '^https://github\.com/.+/releases/download/odt-mirror/')
+    Assert 'odt: backup hash is 64 hex'        (Test-Match $OdtPinnedHash '^[0-9A-F]{64}$')
+
+    # Registry-only OS info: must work without WMI and must not call it.
+    $wi = Get-WinInfo
+    Assert 'win info: family is Windows 10/11' (Test-Match $wi.Name '^Windows 1[01]$')
+    Assert 'win info: build read'     ($wi.Build -gt 10000)
+    Assert 'win info: summary filled'          ($wi.Summary.Length -gt 10)
+    Assert 'win info: cached'         ([object]::ReferenceEquals($wi, (Get-WinInfo)))
+
+    # Edition list must be deduplicated (the raw WMI query returned 61 rows with repeats here).
+    $eds = @(Get-EditionList)
+    Assert 'edition: deduplicated' (@($eds | Sort-Object -Unique).Count -eq $eds.Count)
+
+    Assert "version format" (Test-Match $Version '^\d+\.\d+\.\d+$')
+    Assert 'author defined' ($Author.Length -gt 3)
+    Assert 'short url is https' (Test-Match $ShortUrl '^https://')
+
+    
     $tk = @($Strings['tr'].Keys); $ek = @($Strings['en'].Keys)
     $diff = @(Compare-Object $tk $ek)
-    Assert 'TR/EN anahtar paritesi' ($diff.Count -eq 0)
+    Assert 'TR/EN key parity' ($diff.Count -eq 0)
 
-    # arayuz metinlerinde metot adi gecmemeli (her iki dil)
+    
     $leak = @()
     foreach ($lg in @('tr', 'en')) {
         foreach ($k in $Strings[$lg].Keys) {
@@ -959,7 +1390,7 @@ if ($args -contains '-SelfTest') {
     if ($fail -eq 0) { exit 0 } else { exit 1 }
 }
 
-# "/"-li arguman varsa dogrudan AIO'ya aktar (orn: ActivaterWindows.ps1 /HWID)
+
 $forward = @($args) | Where-Object { $_ -match '^/' }
 if ($forward) { Invoke-MasAio ($forward -join ' '); return }
 
@@ -968,10 +1399,33 @@ if ($args -contains '-Probe') {
     $eng = Resolve-Engine
     if ($eng) {
         Write-Host ("PROBE OK - motor alindi ve SHA256 dogrulandi. kaynak={0} commit={1} boyut={2} bayt" -f $eng.Source, $eng.Commit, $eng.Text.Length) -ForegroundColor Green
-        exit 0
+    } else {
+        Write-Host 'PROBE FAIL - engine' -ForegroundColor Red
     }
-    Write-Host 'PROBE FAIL' -ForegroundColor Red
-    exit 1
+    # ODT mirror reachability (HEAD only, nothing is downloaded).
+    try {
+        $req = [Net.HttpWebRequest]::Create($OdtMirrorUrl)
+        $req.Method = 'HEAD'
+        $req.UserAgent = 'ActivaterWindows'
+        $req.Timeout = 30000
+        $resp = $req.GetResponse()
+        $len = $resp.ContentLength
+        $resp.Close()
+        Write-Host ("ODT MIRROR OK - {0} bayt" -f $len) -ForegroundColor Green
+    } catch {
+        Write-Host ("ODT MIRROR FAIL - {0}" -f $_.Exception.Message) -ForegroundColor Red
+    }
+    if ($eng) { exit 0 } else { exit 1 }
 }
 
-while ($true) { if (Show-Menu) { break } }
+# Entry point. Closed input (a piped run that ran out of lines, Ctrl+C) ends the session cleanly
+# instead of turning into an error dump, and cleans up the temp folder if one was in use.
+try {
+    Invoke-Main
+} catch [System.OperationCanceledException] {
+    Write-Host ''
+} finally {
+    if ($script:WorkDir -and (Test-Path $script:WorkDir)) {
+        Remove-Item $script:WorkDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
