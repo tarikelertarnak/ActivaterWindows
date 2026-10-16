@@ -68,10 +68,13 @@ irm https://raw.githubusercontent.com/tarikelertarnak/ActivaterWindows/main/Acti
 | 2 | Office etkinleştirme (LTSC/365/C2R) | **Ohook** | Kalıcı |
 | 3 | Windows + ESU + Office | **TSforge** | Kalıcı |
 | 4 | Windows 10 ESU | **TSforge** | Kalıcı |
-| 5 | Windows / Office | **Online KMS** | 180 gün (otomatik yenileme) |
-| 6 | Aktivasyon durumu | MAS Check | — |
-| 7 | **TAM MAS menüsü** | Tüm özellikler: Troubleshoot, Windows/Office sürüm değiştirme, $OEM$ klasörü, changelog | — |
-| 8 | Office LTSC Pro Plus 2024 kurulumu | ODT + otomatik Ohook teklifi | — |
+| 5 | Aktivasyon durumu | MAS Check | — |
+| 6 | **TAM MAS menüsü** | Tüm özellikler: Troubleshoot, Windows/Office sürüm değiştirme, $OEM$ klasörü, changelog | — |
+| 7 | Office LTSC Pro Plus 2024 kurulumu | ODT + otomatik Ohook teklifi | — |
+| 8 | **HEPSINI YAP** | Ofis yoksa kurar → Windows + ESU + Office TSforge ile tek geçişte → durum raporu | Kalıcı |
+| L | Arayuz dili (Otomatik / Turkce / English) | — | — |
+
+> Online KMS (180 gün) menüden kaldırıldı — kalıcı TSforge varken gereksiz. MAS'ın Tam Menüsü'nden (6) erişilebilir.
 
 ### Güvenlik Mimarisi
 

@@ -1,5 +1,23 @@
 # ActivaterWindows — Progress Log
 
+## 2026-10-16 — v2.0.2: arayuz dili (tr/en), HEPSINI YAP, KMS kaldirildi
+
+### Degisiklikler
+- **Arayuz dili secenegi** menu en ustunde: `[A] Otomatik (su an: tr-tr)  [T] Turkce  [E] English`
+  + `[L]` tusu ile menu icinden degistirilebilir. Varsayilan: Otomatik (sistem kulturu; `tr*` → tr, digeri → en).
+  Iki dil icin tam ceviri sozlugu (42 anahtar x 2 dil). Tum menu/alt metin/mesajlar T() ile cevrili.
+- **[8] HEPSINI YAP** (tek tik "her sey"): Ofis kurulu degilse sorup kurar (TSforge zaten Office'i aktive eder),
+  ardindan `/Z-WindowsESUOffice` ile Windows + ESU + Office kalici aktivasyon, en son durum raporu.
+- **Online KMS (180 gun) menuden KALDIRILDI** — kalici TSforge + Ohook + HWID varken gereksiz.
+  MAS'in kendi tam menusunden (6) erisilebilir.
+- Menu yeniden numaralandi (KMS cikti): [1-4] aktivasyon, [5] durum, [6] TAM MAS, [7] Office kur, [8] hepsini, [0] cik.
+- Office kurulum dili default'u arayuz diliyle eslesiyor (tr → tr-tr, en → en-us, auto → sistem).
+
+### Dogrulama
+- Parse: `PARSE OK`.
+- i18n testi: TR/EN render, 42 anahtar karsilastirmasi (fark 0), auto→tr, Test-OfficeC2R ve
+  Default-OfficeLang calisiyor → `I18N TEST OK`.
+
 ## 2026-10-16 — v2.0.1: ilk test turu düzeltmeleri (banner, dil, ODT indirme)
 
 ### Düzeltmeler (Kai'nin test raporu)
