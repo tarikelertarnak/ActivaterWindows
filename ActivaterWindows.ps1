@@ -1078,22 +1078,20 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
     # Kurulu Office varsa sor (E/h, bos = evet)
+    $removeOffice = $false
     if (Test-OfficeC2R) {
         if (-not (Confirm (T 'office_installed'))) {
             Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
             return
         }
+        $removeOffice = $true
     }
-    $removeOffice = Test-OfficeC2R
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
-    $script:WorkDir = $work   # so a cancelled run (closed input / Ctrl+C) can still clean up
+    $script:WorkDir = $work
     New-Item -ItemType Directory -Path $work -Force | Out-Null
     $odt = Join-Path $work 'odt.exe'
 
-    # 1) Get the tool and unpack it BEFORE asking anything: the download is the slow part and the
-    #    questions are pointless if it cannot be obtained. On Esc the loop restarts but keeps the
-    #    already-verified tool, so a cancelled run never re-downloads.
     while ($true) {
         if (-not (Test-OdtFile $odt)) {
             if (-not (Get-OdtTool -OutFile $odt)) {
@@ -1109,60 +1107,57 @@ function Install-OfficeLTSC {
         }
         if (-not (Test-Path $setup)) {
             Write-Host (T 'extract_fail') -ForegroundColor Red
-            Remove-Item -Path $odt -Force -ErrorAction SilentlyContinue   # likely a broken download: refetch once
+            Remove-Item -Path $odt -Force -ErrorAction SilentlyContinue
             continue
         }
 
-        # If Office was already installed, remove it properly via OfficeC2RClient before installing fresh.
+        # Office varsa ODT setup.exe /configure Remove.xml ile kaldir
         if ($removeOffice) {
             Write-Host ''
             Write-Host ('  ' + (T 'office_removing')) -ForegroundColor Cyan
-
-            # OfficeC2RClient.exe /uninstall kaldirmak icin daha guvenilir (M365 dahil her C2R)
-            $c2rClient = $null
-            foreach ($p in @(
-                "$env:ProgramFiles\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe",
-                "${env:ProgramFiles(x86)}\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe"
-            )) { if (Test-Path $p) { $c2rClient = $p; break } }
-
-            $removed = $false
-            if ($c2rClient) {
-                # /uninstall DisplayLevel=None ile sessiz, ProgId parametresi gerekmiyor
-                $p2 = Start-Process -FilePath $c2rClient -ArgumentList '/uninstall ProgId=O365ProPlusRetail DisplayLevel=None' -Verb RunAs -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
-                if (-not $p2) {
-                    # UAC'siz dene (zaten admin ise)
-                    $p2 = Start-Process -FilePath $c2rClient -ArgumentList '/uninstall ProgId=O365ProPlusRetail DisplayLevel=None' -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+            $removeXml = Join-Path $work 'Remove.xml'
+            [IO.File]::WriteAllText($removeXml, '<Configuration><Remove All="TRUE"/><Display Level="None" AcceptEULA="TRUE"/></Configuration>')
+            $isAdminNow = Test-Admin
+            if ($isAdminNow) {
+                $pr = Start-Process -FilePath $setup -ArgumentList "/configure `"$removeXml`"" -PassThru -WindowStyle Hidden
+                if (-not (Wait-WithBar { $pr.HasExited } 900)) {
+                    Write-Host (T 'step_timeout') -ForegroundColor Red
+                    try { Stop-Process -Id $pr.Id -Force -ErrorAction SilentlyContinue } catch {}
+                    Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                    return
                 }
-                if ($p2) {
-                    if (-not (Wait-WithBar { $p2.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
-                    # C2RClient her zaman 0 dondurmeyebilir; kaldirmayi Test-OfficeC2R ile dogrula
-                    Start-Sleep -Milliseconds 2000
-                    $removed = -not (Test-OfficeC2R)
+                if ($pr.ExitCode -ne 0) {
+                    Write-Host ((T 'office_remove_fail') -f $pr.ExitCode) -ForegroundColor Red
+                    Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                    return
                 }
-            }
-
-            # C2RClient bulunamazsa veya basarisizsa ODT Remove.xml ile dene (fallback)
-            if (-not $removed) {
-                $removeXml = Join-Path $work 'Remove.xml'
-                [IO.File]::WriteAllText($removeXml, '<Configuration ID="aw-office-remove"><Remove All="TRUE" /></Configuration>')
-                $isAdminR = Test-Admin
-                if ($isAdminR) {
-                    $pr = Start-Process -FilePath $setup -ArgumentList "/configure `"$removeXml`"" -PassThru -WindowStyle Hidden
-                    if (-not (Wait-WithBar { $pr.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
-                    if ($pr.ExitCode -ne 0) { Write-Host ((T 'office_remove_fail') -f $pr.ExitCode) -ForegroundColor Red; return }
-                } else {
-                    Write-Host (T 'inst_uac') -ForegroundColor Cyan
-                    $rcFile2 = Join-Path $work 'remove_rc.txt'
-                    $pr = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$removeXml'; Set-Content -LiteralPath '$rcFile2' -Value `$LASTEXITCODE -Encoding ASCII`""
-                    if (-not (Wait-WithBar { (Test-Path $rcFile2) -or $pr.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+            } else {
+                Write-Host (T 'inst_uac') -ForegroundColor Cyan
+                $rcFile2 = Join-Path $work 'remove_rc.txt'
+                try {
+                    $pr = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru `
+                        -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$removeXml'; [IO.File]::WriteAllText('$rcFile2', `$LASTEXITCODE)`""
+                    if (-not (Wait-WithBar { (Test-Path $rcFile2) -or $pr.HasExited } 900)) {
+                        Write-Host (T 'step_timeout') -ForegroundColor Red
+                        Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                        return
+                    }
                     if (Test-Path $rcFile2) {
                         $rcTxt = (Get-Content -LiteralPath $rcFile2 -Raw).Trim()
-                        if ($rcTxt -match '^-?\d+$' -and [int]$rcTxt -ne 0) { Write-Host ((T 'office_remove_fail') -f $rcTxt) -ForegroundColor Red; return }
+                        if ($rcTxt -match '^-?\d+$' -and [int]$rcTxt -ne 0) {
+                            Write-Host ((T 'office_remove_fail') -f $rcTxt) -ForegroundColor Red
+                            Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                            return
+                        }
                     }
+                } catch {
+                    Write-Host (T 'uac_cancel') -ForegroundColor Yellow
+                    Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+                    return
                 }
             }
-
             Write-Host (T 'office_removed') -ForegroundColor Green
+            $removeOffice = $false  # bir daha girme
         }
 
         # 2) Now the questions.
