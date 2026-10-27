@@ -9,7 +9,7 @@
 
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
-$Version  = '2.5.0'
+$Version  = '3.0.0'
 $Author   = 'TARIK ELER'
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
 $SiteUrl  = 'https://tarikelertarnak.pages.dev/'
@@ -61,15 +61,17 @@ $OfficeAppsRecommended = @('Word', 'Excel', 'PowerPoint')
 $Strings = @{
     tr = @{
         langline = 'Dil / Language :  [A] Otomatik (su an: {0})   [T] Turkce   [E] English'
-        m1 = '  [1]  Windows etkinlestir        kalici dijital lisans'
-        m2 = '  [2]  Office etkinlestir         kalici'
-        m3 = '  [3]  Windows + ESU + Office     tek gecis'
-        m4 = '  [4]  Windows 10 ESU             kalici'
-        m5 = '  [5]  Etkinlestirme durumu       kontrol et'
-        m6 = '  [6]  Office LTSC 2024 kur       dil + bilesen secimi'
-        m7 = '  [7]  HEPSINI ETKINLESTIR        kurulum yok, hepsini etkinlestir'
-        m8 = '  [8]  HEPSINI YAP                kur + etkinlestir + tam menu'
-        m9 = '  [9]  Hakkinda'
+        m1 = '  [1]  Windows etkinlestir                kalici dijital lisans'
+        m2 = '  [2]  Windows surum degistir + etkinles. surum secimi'
+        m3 = '  [3]  Windows 10 ESU                    kalici'
+        m4 = '  [4]  Office etkinlestir                kalici'
+        m5 = '  [5]  Office LTSC 2024 kur              dil + bilesen secimi'
+        m6 = '  [6]  Windows + ESU + Office            tek gecis'
+        m7 = '  [7]  HEPSINI ETKINLESTIR               kurulum yok, hepsini etkinlestir'
+        m8 = '  [8]  HEPSINI YAP                       kur + etkinlestir + tam menü'
+        m9 = '  [9]  Dosya iliskilendirmesini onar     Word/Excel/PowerPoint'
+        mA = '  [A]  Etkinlestirme durumu              kontrol et'
+        mH = '  [H]  Hakkinda'
         mx = '  [0]  Cikis'
         ml = '  [L]  Arayuz dilini degistir'
         choice = 'Secim'
@@ -173,15 +175,17 @@ $Strings = @{
     }
     en = @{
         langline = 'Dil / Language :  [A] Automatic (now: {0})   [T] Turkce   [E] English'
-        m1 = '  [1]  Activate Windows            permanent digital license'
-        m2 = '  [2]  Activate Office             permanent'
-        m3 = '  [3]  Windows + ESU + Office      single pass'
-        m4 = '  [4]  Windows 10 ESU              permanent'
-        m5 = '  [5]  Activation status           check'
-        m6 = '  [6]  Install Office LTSC 2024    language + component picker'
-        m7 = '  [7]  ACTIVATE EVERYTHING         no install, activate all'
-        m8 = '  [8]  DO EVERYTHING               install + activate + full menu'
-        m9 = '  [9]  About'
+        m1 = '  [1]  Activate Windows                  permanent digital license'
+        m2 = '  [2]  Change edition + activate        pick edition & activate'
+        m3 = '  [3]  Windows 10 ESU                  permanent'
+        m4 = '  [4]  Activate Office                 permanent'
+        m5 = '  [5]  Install Office LTSC 2024        language + component picker'
+        m6 = '  [6]  Windows + ESU + Office          single pass'
+        m7 = '  [7]  ACTIVATE EVERYTHING             no install, activate all'
+        m8 = '  [8]  DO EVERYTHING                   install + activate + full menu'
+        m9 = '  [9]  Fix file associations           Word/Excel/PowerPoint'
+        mA = '  [A]  Activation status               check'
+        mH = '  [H]  About'
         mx = '  [0]  Exit'
         ml = '  [L]  Change interface language'
         choice = 'Choice'
@@ -814,6 +818,119 @@ function Test-OfficeC2R {
     $false
 }
 
+# Office Click-to-Run kurulumundan sonra .docx/.xlsx/.pptx gibi dosyalarin cift tikla
+# acilmamasi, sadece yonetici izniyle acilmasi, word'den acmak zorunda kalma sorununu giderir.
+# ProgID'leri yeniden baglar, UserChoice kayitlarini temizler, Word/Excel/PowerPoint
+# icin varsayilan uygulamayi kaydeder.
+function Invoke-FixOfficeAssociations {
+    Clear-Host
+    Write-Banner
+    Write-Host ''
+    Write-Host '  Dosya iliskilendirmeleri onariliyor...' -ForegroundColor Cyan
+    Write-Host ''
+
+    if (-not (Test-Admin)) {
+        Write-Host '  Bu islem yonetici izni gerektirir. UAC aciliyor...' -ForegroundColor Yellow
+        try {
+            $scriptPath = $PSCommandPath
+            Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -FixAssocOnly" -WindowStyle Hidden | Out-Null
+        } catch { }
+        Write-Host '  UAC reddedildi ise islem yapilmadi.' -ForegroundColor DarkYellow
+        return
+    }
+
+    # ProgID -> Office uygulamasi eslesmesi (C2R click-to-run icin)
+    $assocMap = @(
+        @{ Ext = '.doc';   ProgId = 'Word.Document.8' },
+        @{ Ext = '.docx';  ProgId = 'Word.Document.12' },
+        @{ Ext = '.dot';   ProgId = 'Word.Template.8' },
+        @{ Ext = '.dotx';  ProgId = 'Word.Template.12' },
+        @{ Ext = '.rtf';   ProgId = 'Word.RTF.8' },
+        @{ Ext = '.xls';   ProgId = 'Excel.Sheet.8' },
+        @{ Ext = '.xlsx';  ProgId = 'Excel.Sheet.12' },
+        @{ Ext = '.xlsm';  ProgId = 'Excel.SheetMacroEnabled.12' },
+        @{ Ext = '.xlsb';  ProgId = 'Excel.SheetBinaryMacroEnabled.12' },
+        @{ Ext = '.xltx';  ProgId = 'Excel.Template.12' },
+        @{ Ext = '.ppt';   ProgId = 'PowerPoint.Show.8' },
+        @{ Ext = '.pptx';  ProgId = 'PowerPoint.Show.12' },
+        @{ Ext = '.pptm';  ProgId = 'PowerPoint.ShowMacroEnabled.12' },
+        @{ Ext = '.potx';  ProgId = 'PowerPoint.Template.12' }
+    )
+
+    $exeMap = @{
+        'Word'      = 'winword.exe'
+        'Excel'     = 'excel.exe'
+        'PowerPoint'= 'powerpnt.exe'
+    }
+
+    # Office kurulum klasorunu bul (C2R)
+    $officeRoot = $null
+    foreach ($root in @('C:\Program Files\Microsoft Office\root\Office16',
+                        'C:\Program Files (x86)\Microsoft Office\root\Office16',
+                        'C:\Program Files\Microsoft Office 15\root\Office15')) {
+        if (Test-Path $root) { $officeRoot = $root; break }
+    }
+    if (-not $officeRoot) {
+        Write-Host '  Office kurulum klasoru bulunamadi. Once Office kurun.' -ForegroundColor Red
+        return
+    }
+
+    # Her uzanti icin ProgID ve varsayilan uygulamayi kaydet
+    foreach ($a in $assocMap) {
+        $progId = $a.ProgId
+        $ext = $a.Ext
+        $app = if ($progId -like 'Word.*') { 'Word' } elseif ($progId -like 'Excel.*') { 'Excel' } else { 'PowerPoint' }
+        $exe = Join-Path $officeRoot $exeMap[$app]
+        if (-not (Test-Path $exe)) { continue }
+
+        try {
+            # HKCR: ProgID -> command
+            $cmdKey = "HKCR:\$progId\shell\Open\command"
+            if (-not (Test-Path $cmdKey)) { New-Item -Path $cmdKey -Force | Out-Null }
+            Set-ItemProperty -Path $cmdKey -Name '(Default)' -Value "`"$exe`" `"%1`"" -Force
+
+            # HKCR: uzanti -> ProgID
+            $extKey = "HKCR:\$ext"
+            if (-not (Test-Path $extKey)) { New-Item -Path $extKey -Force | Out-Null }
+            Set-ItemProperty -Path $extKey -Name '(Default)' -Value $progId -Force
+
+            # UserChoice (varsayilan) temizle - Windows 10/11'in birakacagi stale kayitlar
+            $userChoice = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\UserChoice"
+            if (Test-Path $userChoice) {
+                Remove-Item -Path $userChoice -Recurse -Force -ErrorAction SilentlyContinue
+            }
+
+            Write-Host ("  OK  {0}  ->  {1}" -f $ext, $progId) -ForegroundColor Green
+        } catch {
+            Write-Host ("  FAIL {0}: {1}" -f $ext, $_.Exception.Message) -ForegroundColor Red
+        }
+    }
+
+    # C2R uygulamalarini "Default Programs" listesine kaydet
+    foreach ($app in @('Word', 'Excel', 'PowerPoint')) {
+        $exe = Join-Path $officeRoot $exeMap[$app]
+        if (-not (Test-Path $exe)) { continue }
+        try {
+            $capKey = "HKLM:\SOFTWARE\RegisteredApplications"
+            $appCap = "Software\\Clients\\StartMenuInternet\\$app"
+            # basit kayit: Programlar listesinde gorunsun
+            $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$($exeMap[$app])"
+            if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
+            Set-ItemProperty -Path $regPath -Name '(Default)' -Value $exe -Force
+        } catch { }
+    }
+
+    # Explorer'i yeniden baslat ki degisiklikler hemen yansisin
+    try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue } catch { }
+    Start-Sleep -Seconds 1
+    try { Start-Process explorer.exe } catch { }
+
+    Write-Host ''
+    Write-Host '  Dosya iliskilendirmeleri onarildi. Explorer yeniden baslatildi.' -ForegroundColor Green
+    Write-Host '  Artik .docx/.xlsx/.pptx dosyalarina cift tiklayarak acabilirsiniz.' -ForegroundColor DarkGray
+    Write-Host ''
+}
+
 function Default-OfficeLang {
     $c = ((Get-Culture).Name).ToLowerInvariant()
     if ($script:UiLang -eq 'tr') { 'tr-tr' }
@@ -1254,19 +1371,21 @@ function Invoke-WindowsMenu {
 function Invoke-Action([string]$Key) {
     switch ($Key) {
         '1' { Invoke-WindowsMenu }
-        '2' { Invoke-MasAio '/Ohook' }
-        '3' { Invoke-MasAio '/Z-WindowsESUOffice' }
-        '4' { Invoke-MasAio '/Z-ESU' }
-        '5' { Invoke-MasCheck }
-        '6' { Install-OfficeLTSC }
+        '2' { Invoke-ChangeEdition }
+        '3' { Invoke-MasAio '/Z-ESU' }
+        '4' { Invoke-MasAio '/Ohook' }
+        '5' { Install-OfficeLTSC }
+        '6' { Invoke-MasAio '/Z-WindowsESUOffice' }
         '7' { Invoke-AllActivate }
         '8' { Invoke-AllInOne }
-        '9' { Show-About }
+        '9' { Invoke-FixOfficeAssociations }
+        'a' { Invoke-MasCheck }
+        'h' { Show-About }
         'l' { Set-UiLang }
     }
 }
 
-# The main screen. Grouped by task so the numbers stay familiar while the layout is readable.
+# The main screen. Grouped by task, numbers stay sequential, colors consistent.
 function Show-MainMenu {
     Clear-Host
     Write-Banner
@@ -1276,18 +1395,20 @@ function Show-MainMenu {
     Write-Host ('  ' + $wi.Summary) -ForegroundColor DarkGray
     Write-Section (T 'sec_win')
     Write-Host (T 'm1') -ForegroundColor White
-    Write-Host (T 'm4') -ForegroundColor DarkGray
+    Write-Host (T 'm2') -ForegroundColor DarkGray
+    Write-Host (T 'm3') -ForegroundColor DarkGray
     Write-Section (T 'sec_off')
-    Write-Host (T 'm2') -ForegroundColor White
-    Write-Host (T 'm6') -ForegroundColor Cyan
+    Write-Host (T 'm4') -ForegroundColor White
+    Write-Host (T 'm5') -ForegroundColor Cyan
     Write-Section (T 'sec_all')
-    Write-Host (T 'm3') -ForegroundColor White
+    Write-Host (T 'm6') -ForegroundColor White
     Write-Host (T 'm7') -ForegroundColor Magenta
     Write-Host (T 'm8') -ForegroundColor Magenta
     Write-Section (T 'sec_info')
-    Write-Host (T 'm5') -ForegroundColor White
     Write-Host (T 'm9') -ForegroundColor White
+    Write-Host (T 'mA') -ForegroundColor White
     Write-Host ''
+    Write-Host (T 'mH') -ForegroundColor DarkGray
     Write-Host (T 'mx') -ForegroundColor DarkGray
     Write-Host (T 'ml') -ForegroundColor DarkGray
     Write-Host ('  ' + (T 'esc_hint')) -ForegroundColor DarkGray
@@ -1304,13 +1425,15 @@ function Invoke-Main {
         if (-not $k) { continue }
         if ($k -eq '0') { return }
         Invoke-Action $k
-        if ($k -ne '9') {
+        if (@('9','a','h') -notcontains $k) {
             Write-Host ''
             [void](Read-Input (T 'back'))
         }
     }
 }
 
+
+if ($args -contains '-FixAssocOnly') { Invoke-FixOfficeAssociations; return }
 
 if (-not (Test-FullLanguageMode)) { return }
 
