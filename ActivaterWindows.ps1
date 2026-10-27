@@ -65,8 +65,8 @@ $Strings = @{
         m2 = '  [2]  Windows surum degistir + etkinles. surum secimi'
         m3 = '  [3]  Windows 10 ESU                    kalici'
         m4 = '  [4]  Office etkinlestir                kalici'
-        m5 = '  [5]  Office LTSC 2024 kur              yukluysa once siler, sonra kur'
-        m6 = '  [6]  Office kaldir + kur + etkinles    once siler, sonra kur ve etkinlestirir'
+        m5 = '  [5]  Office LTSC 2024 kur              dil + bilesen secimi'
+        m6 = '  [6]  Office LTSC 2024 kur + etkinles  onceki surumu temizler, kurar, etkinlestirir'
         m7 = '  [7]  Windows + ESU + Office            tek gecis'
         m8 = '  [8]  HEPSINI ETKINLESTIR               kurulum yok, hepsini etkinlestir'
         m9 = '  [9]  HEPSINI YAP                       kur + etkinlestir + tam menü'
@@ -184,8 +184,8 @@ $Strings = @{
         m2 = '  [2]  Change edition + activate        pick edition & activate'
         m3 = '  [3]  Windows 10 ESU                  permanent'
         m4 = '  [4]  Activate Office                 permanent'
-        m5 = '  [5]  Install Office LTSC 2024        removes existing, then installs'
-        m6 = '  [6]  Remove + Install + Activate     wipes existing, installs, activates'
+        m5 = '  [5]  Install Office LTSC 2024        language + component picker'
+        m6 = '  [6]  Office LTSC 2024 install + act   clears existing, installs, activates'
         m7 = '  [7]  Windows + ESU + Office          single pass'
         m8 = '  [8]  ACTIVATE EVERYTHING             no install, activate all'
         m9 = '  [9]  DO EVERYTHING                   install + activate + full menu'
@@ -1107,27 +1107,55 @@ function Install-OfficeLTSC {
             continue
         }
 
-        # If Office was already installed and the user agreed, remove it before installing fresh.
+        # If Office was already installed, remove it properly via OfficeC2RClient before installing fresh.
         if ($removeOffice) {
             Write-Host ''
             Write-Host ('  ' + (T 'office_removing')) -ForegroundColor Cyan
-            $removeXml = Join-Path $work 'Remove.xml'
-            [IO.File]::WriteAllText($removeXml, '<Configuration ID="aw-office-remove"><Remove All="TRUE" /></Configuration>')
-            $isAdmin = Test-Admin
-            if ($isAdmin) {
-                $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$removeXml`"" -PassThru -WindowStyle Hidden
-                if (-not (Wait-WithBar { $p.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
-                if ($p.ExitCode -ne 0) { Write-Host ((T 'office_remove_fail') -f $p.ExitCode) -ForegroundColor Red; return }
-            } else {
-                Write-Host (T 'inst_uac') -ForegroundColor Cyan
-                $rcFile = Join-Path $work 'remove_rc.txt'
-                $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$removeXml'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII`""
-                if (-not (Wait-WithBar { (Test-Path $rcFile) -or $p.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
-                if (Test-Path $rcFile) {
-                    $rcTxt = (Get-Content -LiteralPath $rcFile -Raw).Trim()
-                    if ($rcTxt -match '^-?\d+$' -and [int]$rcTxt -ne 0) { Write-Host ((T 'office_remove_fail') -f $rcTxt) -ForegroundColor Red; return }
+
+            # OfficeC2RClient.exe /uninstall kaldirmak icin daha guvenilir (M365 dahil her C2R)
+            $c2rClient = $null
+            foreach ($p in @(
+                "$env:ProgramFiles\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe",
+                "${env:ProgramFiles(x86)}\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe"
+            )) { if (Test-Path $p) { $c2rClient = $p; break } }
+
+            $removed = $false
+            if ($c2rClient) {
+                # /uninstall DisplayLevel=None ile sessiz, ProgId parametresi gerekmiyor
+                $p2 = Start-Process -FilePath $c2rClient -ArgumentList '/uninstall ProgId=O365ProPlusRetail DisplayLevel=None' -Verb RunAs -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+                if (-not $p2) {
+                    # UAC'siz dene (zaten admin ise)
+                    $p2 = Start-Process -FilePath $c2rClient -ArgumentList '/uninstall ProgId=O365ProPlusRetail DisplayLevel=None' -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+                }
+                if ($p2) {
+                    if (-not (Wait-WithBar { $p2.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+                    # C2RClient her zaman 0 dondurmeyebilir; kaldirmayi Test-OfficeC2R ile dogrula
+                    Start-Sleep -Milliseconds 2000
+                    $removed = -not (Test-OfficeC2R)
                 }
             }
+
+            # C2RClient bulunamazsa veya basarisizsa ODT Remove.xml ile dene (fallback)
+            if (-not $removed) {
+                $removeXml = Join-Path $work 'Remove.xml'
+                [IO.File]::WriteAllText($removeXml, '<Configuration ID="aw-office-remove"><Remove All="TRUE" /></Configuration>')
+                $isAdminR = Test-Admin
+                if ($isAdminR) {
+                    $pr = Start-Process -FilePath $setup -ArgumentList "/configure `"$removeXml`"" -PassThru -WindowStyle Hidden
+                    if (-not (Wait-WithBar { $pr.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+                    if ($pr.ExitCode -ne 0) { Write-Host ((T 'office_remove_fail') -f $pr.ExitCode) -ForegroundColor Red; return }
+                } else {
+                    Write-Host (T 'inst_uac') -ForegroundColor Cyan
+                    $rcFile2 = Join-Path $work 'remove_rc.txt'
+                    $pr = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$removeXml'; Set-Content -LiteralPath '$rcFile2' -Value `$LASTEXITCODE -Encoding ASCII`""
+                    if (-not (Wait-WithBar { (Test-Path $rcFile2) -or $pr.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+                    if (Test-Path $rcFile2) {
+                        $rcTxt = (Get-Content -LiteralPath $rcFile2 -Raw).Trim()
+                        if ($rcTxt -match '^-?\d+$' -and [int]$rcTxt -ne 0) { Write-Host ((T 'office_remove_fail') -f $rcTxt) -ForegroundColor Red; return }
+                    }
+                }
+            }
+
             Write-Host (T 'office_removed') -ForegroundColor Green
         }
 
@@ -1213,22 +1241,15 @@ function Test-Win10 {
     ($wi.Build -gt 0 -and $wi.Build -lt 22000)
 }
 
-# [6] REMOVE + INSTALL + ACTIVATE - sorar, onay alir, siler, kurar, etkinlestirir.
+# [6] Office LTSC 2024 kur + etkinlestir — onceki surumu sessizce temizler, kurar, etkinlestirir.
 function Invoke-OfficeReinstallActivate {
     Write-Host ''
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
-    Write-Host '   Office LTSC 2024  --  Kaldir + Kur + Etkinlestir' -ForegroundColor Cyan
+    Write-Host '   Office LTSC Professional Plus 2024' -ForegroundColor Cyan
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ''
 
-    if (Test-OfficeC2R) {
-        if (-not (Confirm (T 'office_installed'))) {
-            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
-            return
-        }
-    }
-
-    # Kur (iceride zaten kuruluysa siler) + sonunda etkinlestir
+    # $removeOffice = $true olursa Install-OfficeLTSC icinde sessizce temizlenir
     Install-OfficeLTSC
 }
 
