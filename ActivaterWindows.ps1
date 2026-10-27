@@ -839,105 +839,105 @@ function Invoke-FixOfficeAssociations {
     Write-Host '  Dosya iliskilendirmeleri onariliyor...' -ForegroundColor Cyan
     Write-Host ''
 
-    if (-not (Test-Admin)) {
-        Write-Host '  Bu islem yonetici izni gerektirir. UAC aciliyor...' -ForegroundColor Yellow
-        try {
-            $scriptPath = $PSCommandPath
-            Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -FixAssocOnly" -WindowStyle Hidden | Out-Null
-        } catch { }
-        Write-Host '  UAC reddedildi ise islem yapilmadi.' -ForegroundColor DarkYellow
+    if (-not (Test-OfficeC2R)) {
+        Write-Host '  Office kurulu degil. Once Office kurun.' -ForegroundColor Red
         return
     }
 
-    # ProgID -> Office uygulamasi eslesmesi (C2R click-to-run icin)
-    $assocMap = @(
-        @{ Ext = '.doc';   ProgId = 'Word.Document.8' },
-        @{ Ext = '.docx';  ProgId = 'Word.Document.12' },
-        @{ Ext = '.dot';   ProgId = 'Word.Template.8' },
-        @{ Ext = '.dotx';  ProgId = 'Word.Template.12' },
-        @{ Ext = '.rtf';   ProgId = 'Word.RTF.8' },
-        @{ Ext = '.xls';   ProgId = 'Excel.Sheet.8' },
-        @{ Ext = '.xlsx';  ProgId = 'Excel.Sheet.12' },
-        @{ Ext = '.xlsm';  ProgId = 'Excel.SheetMacroEnabled.12' },
-        @{ Ext = '.xlsb';  ProgId = 'Excel.SheetBinaryMacroEnabled.12' },
-        @{ Ext = '.xltx';  ProgId = 'Excel.Template.12' },
-        @{ Ext = '.ppt';   ProgId = 'PowerPoint.Show.8' },
-        @{ Ext = '.pptx';  ProgId = 'PowerPoint.Show.12' },
-        @{ Ext = '.pptm';  ProgId = 'PowerPoint.ShowMacroEnabled.12' },
-        @{ Ext = '.potx';  ProgId = 'PowerPoint.Template.12' }
-    )
+    # OfficeC2RClient.exe bul
+    $c2rClient = $null
+    foreach ($p in @(
+        "$env:ProgramFiles\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe",
+        "${env:ProgramFiles(x86)}\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe"
+    )) { if (Test-Path $p) { $c2rClient = $p; break } }
 
-    $exeMap = @{
-        'Word'      = 'winword.exe'
-        'Excel'     = 'excel.exe'
-        'PowerPoint'= 'powerpnt.exe'
+    if (-not $c2rClient) {
+        Write-Host '  OfficeC2RClient.exe bulunamadi.' -ForegroundColor Red
+        return
     }
 
-    # Office kurulum klasorunu bul (C2R)
+    # 1) Office kurulum klasorunu bul
     $officeRoot = $null
-    foreach ($root in @('C:\Program Files\Microsoft Office\root\Office16',
-                        'C:\Program Files (x86)\Microsoft Office\root\Office16',
-                        'C:\Program Files\Microsoft Office 15\root\Office15')) {
-        if (Test-Path $root) { $officeRoot = $root; break }
-    }
-    if (-not $officeRoot) {
-        Write-Host '  Office kurulum klasoru bulunamadi. Once Office kurun.' -ForegroundColor Red
-        return
-    }
+    foreach ($root in @(
+        "$env:ProgramFiles\Microsoft Office\root\Office16",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office16",
+        "$env:ProgramFiles\Microsoft Office\root\Office15",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office15"
+    )) { if (Test-Path $root) { $officeRoot = $root; break } }
 
-    # Her uzanti icin ProgID ve varsayilan uygulamayi kaydet
-    foreach ($a in $assocMap) {
-        $progId = $a.ProgId
-        $ext = $a.Ext
-        $app = if ($progId -like 'Word.*') { 'Word' } elseif ($progId -like 'Excel.*') { 'Excel' } else { 'PowerPoint' }
-        $exe = Join-Path $officeRoot $exeMap[$app]
-        if (-not (Test-Path $exe)) { continue }
-
-        try {
-            # HKCR: ProgID -> command
-            $cmdKey = "HKCR:\$progId\shell\Open\command"
-            if (-not (Test-Path $cmdKey)) { New-Item -Path $cmdKey -Force | Out-Null }
-            Set-ItemProperty -Path $cmdKey -Name '(Default)' -Value "`"$exe`" `"%1`"" -Force
-
-            # HKCR: uzanti -> ProgID
-            $extKey = "HKCR:\$ext"
-            if (-not (Test-Path $extKey)) { New-Item -Path $extKey -Force | Out-Null }
-            Set-ItemProperty -Path $extKey -Name '(Default)' -Value $progId -Force
-
-            # UserChoice (varsayilan) temizle - Windows 10/11'in birakacagi stale kayitlar
-            $userChoice = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\UserChoice"
-            if (Test-Path $userChoice) {
-                Remove-Item -Path $userChoice -Recurse -Force -ErrorAction SilentlyContinue
+    # 2) HKCR ProgID -> exe komutlarini yaz (SYSTEM kapsamli, kalici)
+    if ($officeRoot) {
+        $exeMap = @{
+            'winword.exe'   = @('Word.Document.12','Word.Document.8','Word.Template.12','Word.Template.8','Word.RTF.8')
+            'excel.exe'     = @('Excel.Sheet.12','Excel.Sheet.8','Excel.SheetMacroEnabled.12','Excel.SheetBinaryMacroEnabled.12','Excel.Template.12')
+            'powerpnt.exe'  = @('PowerPoint.Show.12','PowerPoint.Show.8','PowerPoint.ShowMacroEnabled.12','PowerPoint.Template.12')
+        }
+        foreach ($exe in $exeMap.Keys) {
+            $exePath = Join-Path $officeRoot $exe
+            if (-not (Test-Path $exePath)) { continue }
+            foreach ($progId in $exeMap[$exe]) {
+                $cmdKey = "HKCR:\$progId\shell\Open\command"
+                try {
+                    if (-not (Test-Path $cmdKey)) { New-Item -Path $cmdKey -Force | Out-Null }
+                    Set-ItemProperty -Path $cmdKey -Name '(Default)' -Value "`"$exePath`" `"%1`"" -Force
+                } catch { }
             }
+        }
 
-            Write-Host ("  OK  {0}  ->  {1}" -f $ext, $progId) -ForegroundColor Green
-        } catch {
-            Write-Host ("  FAIL {0}: {1}" -f $ext, $_.Exception.Message) -ForegroundColor Red
+        # App Paths guncelle (Explorer "ile ac" listesi icin)
+        foreach ($exe in @('winword.exe','excel.exe','powerpnt.exe')) {
+            $exePath = Join-Path $officeRoot $exe
+            if (-not (Test-Path $exePath)) { continue }
+            $apKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe"
+            try {
+                if (-not (Test-Path $apKey)) { New-Item -Path $apKey -Force | Out-Null }
+                Set-ItemProperty -Path $apKey -Name '(Default)' -Value $exePath -Force
+                Set-ItemProperty -Path $apKey -Name 'Path' -Value $officeRoot -Force
+            } catch { }
         }
     }
 
-    # C2R uygulamalarini "Default Programs" listesine kaydet
-    foreach ($app in @('Word', 'Excel', 'PowerPoint')) {
-        $exe = Join-Path $officeRoot $exeMap[$app]
-        if (-not (Test-Path $exe)) { continue }
-        try {
-            $capKey = "HKLM:\SOFTWARE\RegisteredApplications"
-            $appCap = "Software\\Clients\\StartMenuInternet\\$app"
-            # basit kayit: Programlar listesinde gorunsun
-            $regPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$($exeMap[$app])"
-            if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
-            Set-ItemProperty -Path $regPath -Name '(Default)' -Value $exe -Force
-        } catch { }
+    # 3) UserChoice kayitlarini temizle
+    # Windows 10/11'de UserChoice hash korumalı — Remove-Item ile silebiliriz cunku
+    # bir sonraki adimda ie4uinit rebuild ediyor.
+    $extList = @('.doc','.docx','.dot','.dotx','.rtf','.xls','.xlsx','.xlsm','.xlsb','.xltx','.ppt','.pptx','.pptm','.potx')
+    foreach ($ext in $extList) {
+        $ucKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\UserChoice"
+        if (Test-Path $ucKey) {
+            try { Remove-Item -Path $ucKey -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+        }
+        # OpenWithProgids'i de temizle - acilis listesini kirletir
+        $owKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\OpenWithProgids"
+        if (Test-Path $owKey) {
+            try { Remove-Item -Path $owKey -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+        }
+    }
+    Write-Host '  Registry temizlendi.' -ForegroundColor DarkGray
+
+    # 4) C2R repair ile Office kendi iliskilendirmelerini yeniden kaydetsin
+    Write-Host '  Office iliskilendirmeleri yeniden yaziliyor...' -ForegroundColor Cyan
+    try {
+        $pr = Start-Process -FilePath $c2rClient -ArgumentList '/repair onshowinuisuppressed=true' -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+        if (-not $pr) {
+            $pr = Start-Process -FilePath $c2rClient -ArgumentList '/repair onshowinuisuppressed=true' -Verb RunAs -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+        }
+        if ($pr) { if (-not (Wait-WithBar { $pr.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor DarkYellow } }
+    } catch { }
+
+    # 5) ie4uinit ile Windows file association cache'ini yenile
+    $ie4 = "$env:SystemRoot\System32\ie4uinit.exe"
+    if (Test-Path $ie4) {
+        try { Start-Process -FilePath $ie4 -ArgumentList '-show' -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue } catch { }
     }
 
-    # Explorer'i yeniden baslat ki degisiklikler hemen yansisin
+    # 6) Explorer yeniden baslat — gorsel yansima icin
     try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue } catch { }
-    Start-Sleep -Seconds 1
+    Start-Sleep -Milliseconds 1500
     try { Start-Process explorer.exe } catch { }
 
     Write-Host ''
-    Write-Host '  Dosya iliskilendirmeleri onarildi. Explorer yeniden baslatildi.' -ForegroundColor Green
-    Write-Host '  Artik .docx/.xlsx/.pptx dosyalarina cift tiklayarak acabilirsiniz.' -ForegroundColor DarkGray
+    Write-Host '  Tamamlandi. Word/Excel/PowerPoint dosyalari cift tikla acilmali.' -ForegroundColor Green
+    Write-Host '  Hala sorun varsa oturumu kapat/ac veya yeniden basla.' -ForegroundColor DarkGray
     Write-Host ''
 }
 
@@ -1077,7 +1077,13 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
-    # Kurulu Office varsa sormadan sil (5. secenek: kur)
+    # Kurulu Office varsa sor (E/h, bos = evet)
+    if (Test-OfficeC2R) {
+        if (-not (Confirm (T 'office_installed'))) {
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            return
+        }
+    }
     $removeOffice = Test-OfficeC2R
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
@@ -1249,7 +1255,13 @@ function Invoke-OfficeReinstallActivate {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ''
 
-    # $removeOffice = $true olursa Install-OfficeLTSC icinde sessizce temizlenir
+    if (Test-OfficeC2R) {
+        if (-not (Confirm (T 'office_installed'))) {
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            return
+        }
+    }
+
     Install-OfficeLTSC
 }
 
