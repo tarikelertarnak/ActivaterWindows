@@ -65,12 +65,13 @@ $Strings = @{
         m2 = '  [2]  Windows surum degistir + etkinles. surum secimi'
         m3 = '  [3]  Windows 10 ESU                    kalici'
         m4 = '  [4]  Office etkinlestir                kalici'
-        m5 = '  [5]  Office LTSC 2024 kur              dil + bilesen secimi'
-        m6 = '  [6]  Windows + ESU + Office            tek gecis'
-        m7 = '  [7]  HEPSINI ETKINLESTIR               kurulum yok, hepsini etkinlestir'
-        m8 = '  [8]  HEPSINI YAP                       kur + etkinlestir + tam menü'
-        m9 = '  [9]  Dosya iliskilendirmesini onar     Word/Excel/PowerPoint'
+        m5 = '  [5]  Office LTSC 2024 kur              yukluysa once siler, sonra kur'
+        m6 = '  [6]  Office kaldir + kur + etkinles    once siler, sonra kur ve etkinlestirir'
+        m7 = '  [7]  Windows + ESU + Office            tek gecis'
+        m8 = '  [8]  HEPSINI ETKINLESTIR               kurulum yok, hepsini etkinlestir'
+        m9 = '  [9]  HEPSINI YAP                       kur + etkinlestir + tam menü'
         mA = '  [A]  Etkinlestirme durumu              kontrol et'
+        mF = '  [F]  Dosya iliskilendirmesini onar     Word/Excel/PowerPoint'
         mH = '  [H]  Hakkinda'
         mx = '  [0]  Cikis'
         ml = '  [L]  Arayuz dilini degistir'
@@ -183,12 +184,13 @@ $Strings = @{
         m2 = '  [2]  Change edition + activate        pick edition & activate'
         m3 = '  [3]  Windows 10 ESU                  permanent'
         m4 = '  [4]  Activate Office                 permanent'
-        m5 = '  [5]  Install Office LTSC 2024        language + component picker'
-        m6 = '  [6]  Windows + ESU + Office          single pass'
-        m7 = '  [7]  ACTIVATE EVERYTHING             no install, activate all'
-        m8 = '  [8]  DO EVERYTHING                   install + activate + full menu'
-        m9 = '  [9]  Fix file associations           Word/Excel/PowerPoint'
+        m5 = '  [5]  Install Office LTSC 2024        removes existing, then installs'
+        m6 = '  [6]  Remove + Install + Activate     wipes existing, installs, activates'
+        m7 = '  [7]  Windows + ESU + Office          single pass'
+        m8 = '  [8]  ACTIVATE EVERYTHING             no install, activate all'
+        m9 = '  [9]  DO EVERYTHING                   install + activate + full menu'
         mA = '  [A]  Activation status               check'
+        mF = '  [F]  Fix file associations           Word/Excel/PowerPoint'
         mH = '  [H]  About'
         mx = '  [0]  Exit'
         ml = '  [L]  Change interface language'
@@ -1075,14 +1077,8 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
-    $removeOffice = $false
-    if (Test-OfficeC2R) {
-        if (-not (Confirm (T 'office_installed'))) {
-            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
-            return
-        }
-        $removeOffice = $true
-    }
+    # Kurulu Office varsa sormadan sil (5. secenek: kur)
+    $removeOffice = Test-OfficeC2R
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
     $script:WorkDir = $work   # so a cancelled run (closed input / Ctrl+C) can still clean up
@@ -1215,6 +1211,25 @@ function Install-OfficeLTSC {
 function Test-Win10 {
     $wi = Get-WinInfo
     ($wi.Build -gt 0 -and $wi.Build -lt 22000)
+}
+
+# [6] REMOVE + INSTALL + ACTIVATE - sorar, onay alir, siler, kurar, etkinlestirir.
+function Invoke-OfficeReinstallActivate {
+    Write-Host ''
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
+    Write-Host '   Office LTSC 2024  --  Kaldir + Kur + Etkinlestir' -ForegroundColor Cyan
+    Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
+    Write-Host ''
+
+    if (Test-OfficeC2R) {
+        if (-not (Confirm (T 'office_installed'))) {
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            return
+        }
+    }
+
+    # Kur (iceride zaten kuruluysa siler) + sonunda etkinlestir
+    Install-OfficeLTSC
 }
 
 # [7] ACTIVATE EVERYTHING - activation only, no install.
@@ -1416,11 +1431,12 @@ function Invoke-Action([string]$Key) {
         '3' { Invoke-MasAio '/Z-ESU' }
         '4' { Invoke-MasAio '/Ohook' }
         '5' { Install-OfficeLTSC }
-        '6' { Invoke-MasAio '/Z-WindowsESUOffice' }
-        '7' { Invoke-AllActivate }
-        '8' { Invoke-AllInOne }
-        '9' { Invoke-FixOfficeAssociations }
+        '6' { Invoke-OfficeReinstallActivate }
+        '7' { Invoke-MasAio '/Z-WindowsESUOffice' }
+        '8' { Invoke-AllActivate }
+        '9' { Invoke-AllInOne }
         'a' { Invoke-MasCheck }
+        'f' { Invoke-FixOfficeAssociations }
         'h' { Show-About }
         'l' { Set-UiLang }
     }
@@ -1441,12 +1457,13 @@ function Show-MainMenu {
     Write-Section (T 'sec_off')
     Write-Host (T 'm4') -ForegroundColor White
     Write-Host (T 'm5') -ForegroundColor Cyan
+    Write-Host (T 'm6') -ForegroundColor Cyan
     Write-Section (T 'sec_all')
-    Write-Host (T 'm6') -ForegroundColor White
-    Write-Host (T 'm7') -ForegroundColor Magenta
+    Write-Host (T 'm7') -ForegroundColor White
     Write-Host (T 'm8') -ForegroundColor Magenta
+    Write-Host (T 'm9') -ForegroundColor Magenta
     Write-Section (T 'sec_info')
-    Write-Host (T 'm9') -ForegroundColor White
+    Write-Host (T 'mF') -ForegroundColor White
     Write-Host (T 'mA') -ForegroundColor White
     Write-Host ''
     Write-Host (T 'mH') -ForegroundColor DarkGray
@@ -1466,7 +1483,7 @@ function Invoke-Main {
         if (-not $k) { continue }
         if ($k -eq '0') { return }
         Invoke-Action $k
-        if (@('9','a','h') -notcontains $k) {
+        if (@('9','a','f','h') -notcontains $k) {
             Write-Host ''
             [void](Read-Input (T 'back'))
         }
