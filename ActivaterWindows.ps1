@@ -161,7 +161,8 @@ $Strings = @{
         off_ready = 'Kurulum araci hazir. Simdi secimlerini yap:'
         off_summary = 'Dil: {0}   Kurulacak: {1}'
         off_go = 'Kurulum baslatilsin mi? (E/h)'
-        office_installed = 'Office zaten kurulu. Kaldirilsin mi? (E/h, bos = evet)'
+        office_installed = 'Microsoft Office LTSC Professional Plus 2024 zaten kurulu. Temizlensin mi? (E/h, bos = evet)'
+        office_installed_other = 'Baska bir Office surumu kurulu ({0}). Temizlensin mi? (E/h, bos = evet)'
         office_removing = 'Office kaldiriliyor...'
         office_removed = 'Office kaldirildi.'
         office_remove_fail = 'Office kaldirilanamadi (cikis kodu: {0}).'
@@ -280,7 +281,8 @@ $Strings = @{
         off_ready = 'Setup tool ready. Now make your choices:'
         off_summary = 'Language: {0}   Installing: {1}'
         off_go = 'Start the install? (Y/n)'
-        office_installed = 'Office is already installed. Remove it first? (Y/n, blank = yes)'
+        office_installed = 'Microsoft Office LTSC Professional Plus 2024 is already installed. Remove it? (Y/n, blank = yes)'
+        office_installed_other = 'Another Office version is installed ({0}). Remove it? (Y/n, blank = yes)'
         office_removing = 'Removing Office...'
         office_removed = 'Office removed.'
         office_remove_fail = 'Office could not be removed (exit code: {0}).'
@@ -828,6 +830,31 @@ function Test-OfficeC2R {
     $false
 }
 
+# Sadece LTSC Professional Plus 2024 kurulu mu diye bakar (ProPlus2024Volume ProgId)
+function Test-OfficeLTSC2024 {
+    foreach ($root in @(
+        'HKLM:\SOFTWARE\Microsoft\OfficeClickToRun\Configuration',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OfficeClickToRun\Configuration'
+    )) {
+        $cfg = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue
+        if ($cfg -and $cfg.ProductReleaseIds -and
+            ($cfg.ProductReleaseIds -match 'ProPlus2024Volume')) { return $true }
+    }
+    $false
+}
+
+# Herhangi bir C2R Office kurulu mu — LTSC2024 haric (M365, 2021, 2019 vs.)
+function Test-OtherOfficeC2R {
+    foreach ($root in @(
+        'HKLM:\SOFTWARE\Microsoft\OfficeClickToRun\Configuration',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OfficeClickToRun\Configuration'
+    )) {
+        $cfg = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue
+        if ($cfg -and $cfg.ProductReleaseIds) { return $true }
+    }
+    $false
+}
+
 # Office Click-to-Run kurulumundan sonra .docx/.xlsx/.pptx gibi dosyalarin cift tikla
 # acilmamasi, sadece yonetici izniyle acilmasi, word'den acmak zorunda kalma sorununu giderir.
 # ProgID'leri yeniden baglar, UserChoice kayitlarini temizler, Word/Excel/PowerPoint
@@ -1077,10 +1104,31 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
-    # Kurulu Office varsa sor (E/h, bos = evet)
+    # Kurulu Office tespit et, adini goster, sor
     $removeOffice = $false
-    if (Test-OfficeC2R) {
+    if (Test-OfficeLTSC2024) {
+        # Tam olarak LTSC 2024 kurulu
         if (-not (Confirm (T 'office_installed'))) {
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            return
+        }
+        $removeOffice = $true
+    } elseif (Test-OtherOfficeC2R) {
+        # Baska bir C2R Office surumu kurulu (M365, 2021, 2019 vs.)
+        $detectedName = 'Bilinmeyen Office'
+        try {
+            foreach ($root in @(
+                'HKLM:\SOFTWARE\Microsoft\OfficeClickToRun\Configuration',
+                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OfficeClickToRun\Configuration'
+            )) {
+                $cfg = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue
+                if ($cfg -and $cfg.ProductReleaseIds) {
+                    $detectedName = $cfg.ProductReleaseIds -replace ',.*'
+                    break
+                }
+            }
+        } catch {}
+        if (-not (Confirm ((T 'office_installed_other') -f $detectedName))) {
             Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
             return
         }
