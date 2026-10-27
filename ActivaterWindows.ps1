@@ -160,6 +160,10 @@ $Strings = @{
         off_ready = 'Kurulum araci hazir. Simdi secimlerini yap:'
         off_summary = 'Dil: {0}   Kurulacak: {1}'
         off_go = 'Kurulum baslatilsin mi? (E/h)'
+        office_installed = 'Office zaten kurulu. Kaldirilsin mi? (E/h, bos = evet)'
+        office_removing = 'Office kaldiriliyor...'
+        office_removed = 'Office kaldirildi.'
+        office_remove_fail = 'Office kaldirilanamadi (cikis kodu: {0}).'
         m0back = '  [0]  Geri'
         odt_hash_fail = 'ODT butunluk kontrolu basarisiz, bu kaynak atlaniyor ({0}).'
         win_eds_none = 'Surum listesi okunamadi (WMI). Motorun kendi penceresi yine de listeler.'
@@ -274,6 +278,10 @@ $Strings = @{
         off_ready = 'Setup tool ready. Now make your choices:'
         off_summary = 'Language: {0}   Installing: {1}'
         off_go = 'Start the install? (Y/n)'
+        office_installed = 'Office is already installed. Remove it first? (Y/n, blank = yes)'
+        office_removing = 'Removing Office...'
+        office_removed = 'Office removed.'
+        office_remove_fail = 'Office could not be removed (exit code: {0}).'
         m0back = '  [0]  Back'
         odt_hash_fail = 'ODT integrity check failed, skipping this source ({0}).'
         win_eds_none = 'Could not read the edition list (WMI). The engine window will still list them.'
@@ -1067,6 +1075,15 @@ function Install-OfficeLTSC {
     Write-Host ('  ' + ('=' * 58)) -ForegroundColor DarkCyan
     Write-Host ('  ' + (T 'off_dl_first')) -ForegroundColor DarkGray
 
+    $removeOffice = $false
+    if (Test-OfficeC2R) {
+        if (-not (Confirm (T 'office_installed'))) {
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            return
+        }
+        $removeOffice = $true
+    }
+
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
     $script:WorkDir = $work   # so a cancelled run (closed input / Ctrl+C) can still clean up
     New-Item -ItemType Directory -Path $work -Force | Out-Null
@@ -1092,6 +1109,30 @@ function Install-OfficeLTSC {
             Write-Host (T 'extract_fail') -ForegroundColor Red
             Remove-Item -Path $odt -Force -ErrorAction SilentlyContinue   # likely a broken download: refetch once
             continue
+        }
+
+        # If Office was already installed and the user agreed, remove it before installing fresh.
+        if ($removeOffice) {
+            Write-Host ''
+            Write-Host ('  ' + (T 'office_removing')) -ForegroundColor Cyan
+            $removeXml = Join-Path $work 'Remove.xml'
+            [IO.File]::WriteAllText($removeXml, '<Configuration ID="aw-office-remove"><Remove All="TRUE" /></Configuration>')
+            $isAdmin = Test-Admin
+            if ($isAdmin) {
+                $p = Start-Process -FilePath $setup -ArgumentList "/configure `"$removeXml`"" -PassThru -WindowStyle Hidden
+                if (-not (Wait-WithBar { $p.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+                if ($p.ExitCode -ne 0) { Write-Host ((T 'office_remove_fail') -f $p.ExitCode) -ForegroundColor Red; return }
+            } else {
+                Write-Host (T 'inst_uac') -ForegroundColor Cyan
+                $rcFile = Join-Path $work 'remove_rc.txt'
+                $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -PassThru -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"& '$setup' /configure '$removeXml'; Set-Content -LiteralPath '$rcFile' -Value `$LASTEXITCODE -Encoding ASCII`""
+                if (-not (Wait-WithBar { (Test-Path $rcFile) -or $p.HasExited } 900)) { Write-Host (T 'step_timeout') -ForegroundColor Red }
+                if (Test-Path $rcFile) {
+                    $rcTxt = (Get-Content -LiteralPath $rcFile -Raw).Trim()
+                    if ($rcTxt -match '^-?\d+$' -and [int]$rcTxt -ne 0) { Write-Host ((T 'office_remove_fail') -f $rcTxt) -ForegroundColor Red; return }
+                }
+            }
+            Write-Host (T 'office_removed') -ForegroundColor Green
         }
 
         # 2) Now the questions.
