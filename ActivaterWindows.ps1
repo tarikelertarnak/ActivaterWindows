@@ -166,6 +166,7 @@ $Strings = @{
         office_removing = 'Office kaldiriliyor...'
         office_removed = 'Office kaldirildi.'
         office_remove_fail = 'Office kaldirilanamadi (cikis kodu: {0}).'
+        office_install_running = 'Office kurulum islemi zaten calisiyor. Lutfen bekleyin ve tekrar deneyin (Hata 0-2035).'
         m0back = '  [0]  Geri'
         odt_hash_fail = 'ODT butunluk kontrolu basarisiz, bu kaynak atlaniyor ({0}).'
         win_eds_none = 'Surum listesi okunamadi (WMI). Motorun kendi penceresi yine de listeler.'
@@ -286,6 +287,7 @@ $Strings = @{
         office_removing = 'Removing Office...'
         office_removed = 'Office removed.'
         office_remove_fail = 'Office could not be removed (exit code: {0}).'
+        office_install_running = 'Office install is already running. Please wait and try again (Error 0-2035).'
         m0back = '  [0]  Back'
         odt_hash_fail = 'ODT integrity check failed, skipping this source ({0}).'
         win_eds_none = 'Could not read the edition list (WMI). The engine window will still list them.'
@@ -855,6 +857,21 @@ function Test-OtherOfficeC2R {
     $false
 }
 
+# Office kurulum/islem icinde mi? setup.exe, OfficeC2RClient.exe, msiexec gibi
+# prosesler calisiyorsa ODT kurulumu 0-2035 (already installing) hatasi verir.
+function Test-OfficeInstallRunning {
+    $procs = @('setup', 'OfficeC2RClient', 'msiexec', 'clicktorun',
+               'officeclicktorun', 'spvirtualization')
+    foreach ($p in $procs) {
+        if (Get-Process -Name $p -ErrorAction SilentlyContinue) { return $true }
+    }
+    try {
+        $svc = Get-Service -Name 'ClickToRunSvc' -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -eq 'Running') { return $true }
+    } catch {}
+    $false
+}
+
 # Office Click-to-Run kurulumundan sonra .docx/.xlsx/.pptx gibi dosyalarin cift tikla
 # acilmamasi, sadece yonetici izniyle acilmasi, word'den acmak zorunda kalma sorununu giderir.
 # ProgID'leri yeniden baglar, UserChoice kayitlarini temizler, Word/Excel/PowerPoint
@@ -1244,6 +1261,15 @@ function Install-OfficeLTSC {
             $removeOffice = $false  # bir daha girme
         }
 
+        # Office kurulum/islem zaten calisiyorsa 0-2035 hatasi alinir, engelle.
+        if (Test-OfficeInstallRunning) {
+            Write-Host ''
+            Write-Host (T 'office_install_running') -ForegroundColor Red
+            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
+            Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
+            return
+        }
+
         # 2) Now the questions.
         Write-Host ''
         Write-Host ('  ' + (T 'off_ready')) -ForegroundColor Cyan
@@ -1357,13 +1383,13 @@ function Invoke-AllActivate {
     Invoke-MasCheck
 }
 
-# [8] DO EVERYTHING - install Office when missing, then the [7] flow, then offer the full engine menu.
+# [9] DO EVERYTHING - install Office when missing, then the [8] flow, then offer the full engine menu.
 function Invoke-AllInOne {
     Write-Host ''
     Write-Host (T 'all_start') -ForegroundColor Magenta
-    if (-not (Test-OfficeC2R)) {
-        if (Confirm (T 'all_nooffice')) { Write-Host (T 'all_installing') -ForegroundColor DarkGray; Install-OfficeLTSC -SkipActivate }
-    }
+    # Install-OfficeLTSC kendi icinde kurulu mu diye kontrol eder ve
+    # varsa 'Temizlensin mi? (E/h, bos = evet)' sorar.
+    Install-OfficeLTSC -SkipActivate
     Invoke-AllActivate
     if (Confirm (T 'all_masmenu')) { Invoke-MasAio }
     Write-Host (T 'all_done') -ForegroundColor Green
