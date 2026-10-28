@@ -9,7 +9,7 @@
 
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
-$Version  = '3.0.0'
+$Version  = '3.0.1'
 $Author   = 'TARIK ELER'
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
 $SiteUrl  = 'https://tarikelertarnak.pages.dev/'
