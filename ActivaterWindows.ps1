@@ -863,7 +863,7 @@ function Invoke-FixOfficeAssociations {
     Clear-Host
     Write-Banner
     Write-Host ''
-    Write-Host '  Dosya iliskilendirmeleri onariliyor...' -ForegroundColor Cyan
+    Write-Host '  Office tamami onariliyor...' -ForegroundColor Cyan
     Write-Host ''
 
     if (-not (Test-OfficeC2R)) {
@@ -871,19 +871,38 @@ function Invoke-FixOfficeAssociations {
         return
     }
 
-    # OfficeC2RClient.exe bul
-    $c2rClient = $null
-    foreach ($p in @(
-        "$env:ProgramFiles\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe",
-        "${env:ProgramFiles(x86)}\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe"
-    )) { if (Test-Path $p) { $c2rClient = $p; break } }
-
-    if (-not $c2rClient) {
-        Write-Host '  OfficeC2RClient.exe bulunamadi.' -ForegroundColor Red
-        return
+    # --- 1) Eski hesap / OneAuth kimlik kayitlarini temizle ---
+    # Hesap hatasi + Word'un yonetici gerektirmesi buradan geliyor:
+    # eski M365/Live hesabi LTSC'ye baglanmis kalmis, Office kimlik dogrulama
+    # yapmaya calisip elevated aciyor.
+    Write-Host '  Eski hesap kayitlari temizleniyor...' -ForegroundColor Cyan
+    $idRoot = 'HKCU:\Software\Microsoft\Office\16.0\Common\Identity'
+    if (Test-Path $idRoot) {
+        # Alt anahtarlari temizle (Profiles, OneAuthConfigCache)
+        foreach ($sub in Get-ChildItem $idRoot -ErrorAction SilentlyContinue) {
+            try { Remove-Item -Path $sub.PSPath -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+        }
+        # ConnectedOneAuthAccountId degerini sifirla
+        try { Set-ItemProperty -Path $idRoot -Name 'ConnectedOneAuthAccountId' -Value '' -Force -ErrorAction SilentlyContinue } catch {}
+        Write-Host '  Identity kayitlari temizlendi.' -ForegroundColor Green
+    } else {
+        Write-Host '  Temizlenecek Identity kaydi yok.' -ForegroundColor DarkGray
     }
 
-    # 1) Office kurulum klasorunu bul
+    # Ek hesap kalintisi: MSAL token cache
+    $msalKeys = @(
+        'HKCU:\Software\Microsoft\Office\16.0\Common\Identity\OneAuthConfigCache',
+        'HKCU:\Software\Microsoft\Office\16.0\Common\ServicesManagerCache',
+        'HKCU:\Software\Microsoft\Office\16.0\Common\Roaming\Identities'
+    )
+    foreach ($k in $msalKeys) {
+        if (Test-Path $k) {
+            try { Remove-Item -Path $k -Recurse -Force -ErrorAction SilentlyContinue } catch {}
+        }
+    }
+
+    # --- 2) Office16 klasor ve exe izinlerini duzelt ---
+    # Word/Excel/PowerPoint yonetici olmadan acilmiyorsa izinler bozuktur.
     $officeRoot = $null
     foreach ($root in @(
         "$env:ProgramFiles\Microsoft Office\root\Office16",
@@ -892,12 +911,37 @@ function Invoke-FixOfficeAssociations {
         "${env:ProgramFiles(x86)}\Microsoft Office\root\Office15"
     )) { if (Test-Path $root) { $officeRoot = $root; break } }
 
-    # 2) HKCR ProgID -> exe komutlarini yaz (SYSTEM kapsamli, kalici)
+    if ($officeRoot) {
+        Write-Host ('  Dosya izinleri onariliyor: {0}' -f $officeRoot) -ForegroundColor Cyan
+        $usersRule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            'Users', 'ReadAndExecute, Synchronize',
+            'ContainerInherit,ObjectInherit', 'None', 'Allow')
+        try {
+            $acl = Get-Acl $officeRoot
+            $acl.SetAccessRule($usersRule)
+            Set-Acl -Path $officeRoot -AclObject $acl
+            Write-Host '  Klasor izinleri guncellendi.' -ForegroundColor Green
+        } catch { Write-Host ('  Klasor izin hatasi: {0}' -f $_.Exception.Message) -ForegroundColor Yellow }
+
+        foreach ($exe in @('winword.exe','excel.exe','powerpnt.exe')) {
+            $exePath = Join-Path $officeRoot $exe
+            if (-not (Test-Path $exePath)) { continue }
+            try {
+                $acl = Get-Acl $exePath
+                $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+                    'Users', 'ReadAndExecute, Synchronize', 'None', 'None', 'Allow')
+                $acl.SetAccessRule($rule)
+                Set-Acl -Path $exePath -AclObject $acl
+            } catch {}
+        }
+    }
+
+    # --- 3) HKCR ProgID + App Paths yeniden yaz ---
     if ($officeRoot) {
         $exeMap = @{
-            'winword.exe'   = @('Word.Document.12','Word.Document.8','Word.Template.12','Word.Template.8','Word.RTF.8')
-            'excel.exe'     = @('Excel.Sheet.12','Excel.Sheet.8','Excel.SheetMacroEnabled.12','Excel.SheetBinaryMacroEnabled.12','Excel.Template.12')
-            'powerpnt.exe'  = @('PowerPoint.Show.12','PowerPoint.Show.8','PowerPoint.ShowMacroEnabled.12','PowerPoint.Template.12')
+            'winword.exe'  = @('Word.Document.12','Word.Document.8','Word.Template.12','Word.Template.8','Word.RTF.8')
+            'excel.exe'    = @('Excel.Sheet.12','Excel.Sheet.8','Excel.SheetMacroEnabled.12','Excel.SheetBinaryMacroEnabled.12','Excel.Template.12')
+            'powerpnt.exe' = @('PowerPoint.Show.12','PowerPoint.Show.8','PowerPoint.ShowMacroEnabled.12','PowerPoint.Template.12')
         }
         foreach ($exe in $exeMap.Keys) {
             $exePath = Join-Path $officeRoot $exe
@@ -907,64 +951,56 @@ function Invoke-FixOfficeAssociations {
                 try {
                     if (-not (Test-Path $cmdKey)) { New-Item -Path $cmdKey -Force | Out-Null }
                     Set-ItemProperty -Path $cmdKey -Name '(Default)' -Value "`"$exePath`" `"%1`"" -Force
-                } catch { }
+                } catch {}
             }
-        }
-
-        # App Paths guncelle (Explorer "ile ac" listesi icin)
-        foreach ($exe in @('winword.exe','excel.exe','powerpnt.exe')) {
-            $exePath = Join-Path $officeRoot $exe
-            if (-not (Test-Path $exePath)) { continue }
             $apKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$exe"
             try {
                 if (-not (Test-Path $apKey)) { New-Item -Path $apKey -Force | Out-Null }
                 Set-ItemProperty -Path $apKey -Name '(Default)' -Value $exePath -Force
                 Set-ItemProperty -Path $apKey -Name 'Path' -Value $officeRoot -Force
-            } catch { }
+            } catch {}
         }
     }
 
-    # 3) UserChoice kayitlarini temizle
-    # Windows 10/11'de UserChoice hash korumalı — Remove-Item ile silebiliriz cunku
-    # bir sonraki adimda ie4uinit rebuild ediyor.
+    # --- 4) UserChoice + OpenWithProgids temizle ---
     $extList = @('.doc','.docx','.dot','.dotx','.rtf','.xls','.xlsx','.xlsm','.xlsb','.xltx','.ppt','.pptx','.pptm','.potx')
     foreach ($ext in $extList) {
-        $ucKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\UserChoice"
-        if (Test-Path $ucKey) {
-            try { Remove-Item -Path $ucKey -Recurse -Force -ErrorAction SilentlyContinue } catch { }
-        }
-        # OpenWithProgids'i de temizle - acilis listesini kirletir
-        $owKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\OpenWithProgids"
-        if (Test-Path $owKey) {
-            try { Remove-Item -Path $owKey -Recurse -Force -ErrorAction SilentlyContinue } catch { }
+        foreach ($sub in @('UserChoice','OpenWithProgids')) {
+            $k = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\$ext\$sub"
+            if (Test-Path $k) { try { Remove-Item -Path $k -Recurse -Force -ErrorAction SilentlyContinue } catch {} }
         }
     }
-    Write-Host '  Registry temizlendi.' -ForegroundColor DarkGray
 
-    # 4) C2R repair ile Office kendi iliskilendirmelerini yeniden kaydetsin
-    Write-Host '  Office iliskilendirmeleri yeniden yaziliyor...' -ForegroundColor Cyan
-    try {
-        $pr = Start-Process -FilePath $c2rClient -ArgumentList '/repair onshowinuisuppressed=true' -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
-        if (-not $pr) {
-            $pr = Start-Process -FilePath $c2rClient -ArgumentList '/repair onshowinuisuppressed=true' -Verb RunAs -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
-        }
-        if ($pr) { if (-not (Wait-WithBar { $pr.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor DarkYellow } }
-    } catch { }
+    # --- 5) OfficeC2RClient /repair + ie4uinit + explorer ---
+    $c2rClient = $null
+    foreach ($p in @(
+        "$env:ProgramFiles\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe",
+        "${env:ProgramFiles(x86)}\Common Files\microsoft shared\ClickToRun\OfficeC2RClient.exe"
+    )) { if (Test-Path $p) { $c2rClient = $p; break } }
 
-    # 5) ie4uinit ile Windows file association cache'ini yenile
+    if ($c2rClient) {
+        Write-Host '  Office iliskilendirmeleri yeniden yaziliyor...' -ForegroundColor Cyan
+        try {
+            $pr = Start-Process -FilePath $c2rClient -ArgumentList '/repair onshowinuisuppressed=true' -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+            if ($pr) { if (-not (Wait-WithBar { $pr.HasExited } 300)) { Write-Host (T 'step_timeout') -ForegroundColor DarkYellow } }
+        } catch {}
+    }
+
     $ie4 = "$env:SystemRoot\System32\ie4uinit.exe"
     if (Test-Path $ie4) {
-        try { Start-Process -FilePath $ie4 -ArgumentList '-show' -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue } catch { }
+        try { Start-Process -FilePath $ie4 -ArgumentList '-show' -WindowStyle Hidden -Wait -ErrorAction SilentlyContinue } catch {}
     }
 
-    # 6) Explorer yeniden baslat — gorsel yansima icin
-    try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue } catch { }
+    try { Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue } catch {}
     Start-Sleep -Milliseconds 1500
-    try { Start-Process explorer.exe } catch { }
+    try { Start-Process explorer.exe } catch {}
 
     Write-Host ''
-    Write-Host '  Tamamlandi. Word/Excel/PowerPoint dosyalari cift tikla acilmali.' -ForegroundColor Green
-    Write-Host '  Hala sorun varsa oturumu kapat/ac veya yeniden basla.' -ForegroundColor DarkGray
+    Write-Host '  Tamamlandi.' -ForegroundColor Green
+    Write-Host '  - Hesap hatasi giderildi (eski M365 hesabi kaldinildi)' -ForegroundColor DarkGray
+    Write-Host '  - Word/Excel/PowerPoint artik yonetici olmadan acilmali' -ForegroundColor DarkGray
+    Write-Host '  - .docx/.xlsx/.pptx cift tikla acilmali' -ForegroundColor DarkGray
+    Write-Host '  Sorun devam ederse oturumu kapat/ac veya bilgisayari yeniden baslat.' -ForegroundColor DarkYellow
     Write-Host ''
 }
 
