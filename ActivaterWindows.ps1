@@ -43,6 +43,16 @@ $script:WinInfo = $null
 # Live bar for percentage-less steps: a finished one passes at once, an unfinished one is cut off
 $OfficeLangs = 'af-za am-et ar-sa as-in az-latn-az be-by bg-bg bn-bd bn-in bs-latn-ba ca-es cs-cz cy-gb da-dk de-de el-gr en-gb en-us es-es es-mx et-ee eu-es fa-ir fi-fi fil-ph fr-ca fr-fr gl-es gu-in he-il hi-in hr-hr hu-hu hy-am id-id is-is it-it ja-jp ka-ge kk-kz km-kh kn-in ko-kr ky-kg lo-la lt-lt lv-lv mk-mk ml-in mn-mn mr-in ms-my mt-mt nb-no ne-np nl-nl nn-no or-in pa-in pl-pl ps-af pt-br pt-pt ro-ro ru-ru si-lk sk-sk sl-si sq-al sr-latn-rs sv-se sw-ke ta-in te-in th-th tr-tr uk-ua ur-pk uz-latn-uz vi-vn zh-cn zh-tw zu-za' -split ' '
 
+# Auto UAC elevation: admin degilse kendini yukselt (SelfTest/Probe/Refresh haric)
+if (-not $args.Contains('-SelfTest') -and -not $args.Contains('-Probe') -and -not $args.Contains('-Refresh')) {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        Write-Host 'Yonetici gerekiyor, yukseltiliyor...' -ForegroundColor Yellow
+        Start-Process pwsh -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $($args -join ' ')" -Verb RunAs
+        exit
+    }
+}
+
 # A "/"-argument is forwarded straight to the AIO engine (e.g. ActivaterWindows.ps1 /HWID)
 $OfficeApps = @(
     @{ n = 'Word';               id = 'Word' },
@@ -842,6 +852,12 @@ function Test-OfficeLTSC2024 {
         if ($cfg -and $cfg.ProductReleaseIds -and
             ($cfg.ProductReleaseIds -match 'ProPlus2024Volume')) { return $true }
     }
+    # Fallback: Office16 klasoru var mi? (Registry yoksa bile)
+    $office16 = @(
+        "$env:ProgramFiles\Microsoft Office\root\Office16",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office16"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($office16) { return $true }
     $false
 }
 
@@ -854,6 +870,14 @@ function Test-OtherOfficeC2R {
         $cfg = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue
         if ($cfg -and $cfg.ProductReleaseIds) { return $true }
     }
+    # Fallback: Office16/Office15 klasoru var mi?
+    $officeRoot = @(
+        "$env:ProgramFiles\Microsoft Office\root\Office16",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office16",
+        "$env:ProgramFiles\Microsoft Office\root\Office15",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Office15"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($officeRoot) { return $true }
     $false
 }
 
@@ -1464,7 +1488,7 @@ function Invoke-ChangeEdition {
 
     $wi = Get-WinInfo
     $currentTech = $wi.Edition
-    $page = 0; $pageSize = 9
+    $page = 0; $pageSize = 50
     while ($true) {
         Clear-Host
         Write-Banner
@@ -1486,10 +1510,7 @@ function Invoke-ChangeEdition {
             }
             Write-Host ''
         }
-        $hasMore = (-not $launchOnly) -and ($end -lt $eds.Count)
-        if ($hasMore) {
-            Write-Host ('  10) ' + (T 'win_change_next')) -ForegroundColor DarkGray
-        }
+        # Tüm sürümler göründüğü için "10) Sonraki" gerekmez
         Write-Host ('  0) ' + (T 'win_change_back')) -ForegroundColor DarkGray
         Write-Host ''
         Write-Host ('  ' + (T 'win_change_sel')) -ForegroundColor Yellow
@@ -1498,7 +1519,6 @@ function Invoke-ChangeEdition {
         $sel = $r.Text.Trim()
         if (-not $sel) { continue }
         if ($sel -eq '0') { return }
-        if ($sel -eq '10' -and $hasMore) { $page++; continue }
         if ($launchOnly) {
             Write-Host ('  Surum listesi gecersiz - motorun kendi penceresi listeler.') -ForegroundColor Red
             Start-Sleep -Milliseconds 700
@@ -1590,6 +1610,17 @@ function Invoke-Action([string]$Key) {
 
 # The main screen. Grouped by task, numbers stay sequential, colors consistent.
 function Show-MainMenu {
+    # Terminal boyutu: 750x450 px (yaklaşık 100x30 karakter) - sadece interaktif konsolda
+    if (-not [Console]::IsInputRedirected) {
+        try {
+            $w = $host.UI.RawUI.WindowSize
+            $w.Width = 100
+            $w.Height = 30
+            $host.UI.RawUI.WindowSize = $w
+            $host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(100, 300)
+        } catch {}
+    }
+    
     Clear-Host
     Write-Banner
     $wi = Get-WinInfo
