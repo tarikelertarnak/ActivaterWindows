@@ -1615,10 +1615,10 @@ function Show-MainMenu {
     if (-not [Console]::IsInputRedirected) {
         try {
             $w = $host.UI.RawUI.WindowSize
-            $w.Width = 100
-            $w.Height = 30
+            $w.Width = 106
+            $w.Height = 37
             $host.UI.RawUI.WindowSize = $w
-            $host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(100, 300)
+            $host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(106, 500)
         } catch {}
     }
     
