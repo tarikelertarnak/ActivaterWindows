@@ -8,7 +8,7 @@ irm https://tarikelertarnak.github.io/aw.ps1 | iex
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-2.5.0-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-3.0.1-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/size-%7E67KB-success?style=flat-square" />
   <img src="https://img.shields.io/badge/engine-auto--tracked%20%2B%20SHA256-red?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
@@ -23,7 +23,7 @@ irm https://tarikelertarnak.github.io/aw.ps1 | iex
 
 Version 1.0 was a single PyInstaller `.exe` (19 MB). Version 2.x rebuilt the whole foundation as a plain-text PowerShell script:
 
-| | v1.0 (GUI exe) | v2.3.0 (terminal) |
+| | v1.0 (GUI exe) | v3.0.1 (terminal) |
 |---|---|---|
 | Size | 19 MB PE binary | **~67 KB** of plain text |
 | Format | Compiled, packed, unreadable | **Every line readable**, no packer, no compiler needed |
