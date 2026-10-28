@@ -1504,29 +1504,26 @@ function Invoke-ChangeEdition {
             for ($i = $start; $i -lt $end; $i++) {
                 $info = Get-EditionInfo $eds[$i]
                 $isRec = ($eds[$i] -eq $currentTech)
-                $mark  = if ($isRec) { '[x]' } else { '[ ]' }
-                $tag   = if ($isRec) { '  ' + (T 'win_change_rec') } else { '' }
+                $mark  = '[ ]'
+                $tag   = if ($isRec) { '  (mevcut)' } else { '' }
                 Write-Host ('  {0,2}) {1}  {2,-34}{3}{4}' -f ($i + 1), $mark, $info.Name, $info.Desc, $tag) -ForegroundColor Gray
                 $shownAny = $true
             }
             Write-Host ''
         }
-        # Tüm sürümler göründüğü için "10) Sonraki" gerekmez
-        Write-Host ('  0) ' + (T 'win_change_back')) -ForegroundColor DarkGray
-        Write-Host ''
+        # "0) Geri" kaldırıldı - ESC ile geri dönülür
         Write-Host ('  ' + (T 'win_change_sel')) -ForegroundColor Yellow
         $r = Read-Input ''
         if ($r.Back) { return }
         $sel = $r.Text.Trim()
         if (-not $sel) { continue }
-        if ($sel -eq '0') { return }
         if ($launchOnly) {
             Write-Host ('  Surum listesi gecersiz - motorun kendi penceresi listeler.') -ForegroundColor Red
             Start-Sleep -Milliseconds 700
             continue
         }
         $n = [int]$sel
-        if ($n -lt 1 -or $n -gt $eds.Count -or $n -le $start -or $n -gt $end) {
+        if ($n -lt 1 -or $n -gt $eds.Count) {
             Write-Host ('  Gecersiz secim.') -ForegroundColor Red
             Start-Sleep -Milliseconds 700
             continue
