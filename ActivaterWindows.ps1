@@ -1574,7 +1574,15 @@ function Invoke-Action([string]$Key) {
         '8' { Invoke-AllActivate }
         '9' { Invoke-AllInOne }
         'a' { Invoke-MasCheck }
-        'f' { Invoke-FixOfficeAssociations }
+        'f' {
+            # HKCR/HKLM yazmak icin admin gerekir; degilse yeniden baslat
+            if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+                Write-Host '  Yonetici gerekiyor, yukseltiliyor...' -ForegroundColor Yellow
+                Start-Process pwsh -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `'$PSCommandPath`' -FixAssocOnly" -Verb RunAs -Wait
+            } else {
+                Invoke-FixOfficeAssociations
+            }
+        }
         'h' { Show-About }
         'l' { Set-UiLang }
     }
