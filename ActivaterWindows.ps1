@@ -82,9 +82,8 @@ $Strings = @{
         m8 = '  [8]  HEPSINI ETKINLESTIR               kurulum yok, hepsini etkinlestir'
         m9 = '  [9]  HEPSINI YAP                       kur + etkinlestir + tam menü'
         mA = '  [A]  Etkinlestirme durumu              kontrol et'
-        mF = '  [F]  Dosya iliskilendirmesini onar     Word/Excel/PowerPoint'
         mH = '  [H]  Hakkinda'
-        mx = '  [0]  Cikis'
+        mx = '  [w]  Cikis'
         ml = '  [L]  Arayuz dilini degistir'
         choice = 'Secim'
         back = 'Menuye donmek icin Enter'
@@ -203,9 +202,8 @@ $Strings = @{
         m8 = '  [8]  ACTIVATE EVERYTHING             no install, activate all'
         m9 = '  [9]  DO EVERYTHING                   install + activate + full menu'
         mA = '  [A]  Activation status               check'
-        mF = '  [F]  Fix file associations           Word/Excel/PowerPoint'
         mH = '  [H]  About'
-        mx = '  [0]  Exit'
+        mx = '  [w]  Exit'
         ml = '  [L]  Change interface language'
         choice = 'Choice'
         back = 'Press Enter to return to menu'
@@ -477,12 +475,11 @@ function Write-DlBar([long]$Done, [long]$Total, $Sw) {
 
 
 
-function Write-BusyBar([int]$Tick, [int]$Width = 30, $Sw) {
-    $pos = $Tick % ($Width * 2)
-    if ($pos -ge $Width) { $pos = ($Width * 2) - $pos - 1 }
-    $track = ('-' * $pos) + '#' + ('-' * ($Width - $pos - 1))
+function Write-BusyBar([int]$Tick, $Sw) {
+    $spinner = @('|', '/', '-', '\')
+    $spin = $spinner[$Tick % 4]
     $el = if ($Sw) { [int]$Sw.Elapsed.TotalSeconds } else { 0 }
-    Write-Host ("`r  [{0}] {1,4}s" -f $track, $el) -NoNewline
+    Write-Host ("`r  {0}  {1,4}s" -f $spin, $el) -NoNewline
 }
 
 
@@ -498,7 +495,7 @@ function Wait-WithBar([scriptblock]$IsDone, [int]$MaxSec = 1800) {
         Start-Sleep -Milliseconds 100
     }
     $sw.Stop()
-    Write-Host ("`r  [{0}] {1,4}s" -f ('#' * 30), [int]$sw.Elapsed.TotalSeconds)
+    Write-Host ("`r  {0}  {1,4}s" -f '*', [int]$sw.Elapsed.TotalSeconds)
     $fin
 }
 
@@ -1592,15 +1589,7 @@ function Invoke-Action([string]$Key) {
         '8' { Invoke-AllActivate }
         '9' { Invoke-AllInOne }
         'a' { Invoke-MasCheck }
-        'f' {
-            # HKCR/HKLM yazmak icin admin gerekir; degilse yeniden baslat
-            if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-                Write-Host '  Yonetici gerekiyor, yukseltiliyor...' -ForegroundColor Yellow
-                Start-Process pwsh -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `'$PSCommandPath`' -FixAssocOnly" -Verb RunAs -Wait
-            } else {
-                Invoke-FixOfficeAssociations
-            }
-        }
+# [F] kaldirildi - calismiyordu
         'h' { Show-About }
         'l' { Set-UiLang }
     }
@@ -1638,7 +1627,6 @@ function Show-MainMenu {
     Write-Host (T 'm8') -ForegroundColor Magenta
     Write-Host (T 'm9') -ForegroundColor Magenta
     Write-Section (T 'sec_info')
-    Write-Host (T 'mF') -ForegroundColor White
     Write-Host (T 'mA') -ForegroundColor White
     Write-Host ''
     Write-Host (T 'mH') -ForegroundColor DarkGray
@@ -1656,9 +1644,9 @@ function Invoke-Main {
         if ($r.Back) { continue }
         $k = $r.Text.Trim().ToLowerInvariant()
         if (-not $k) { continue }
-        if ($k -eq '0') { return }
+        if ($k -eq 'w') { return }
         Invoke-Action $k
-        if (@('9','a','f','h') -notcontains $k) {
+        if (@('9','a','h') -notcontains $k) {
             Write-Host ''
             [void](Read-Input (T 'back'))
         }
@@ -1666,7 +1654,6 @@ function Invoke-Main {
 }
 
 
-if ($args -contains '-FixAssocOnly') { Invoke-FixOfficeAssociations; return }
 
 if (-not (Test-FullLanguageMode)) { return }
 
