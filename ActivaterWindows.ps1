@@ -43,13 +43,19 @@ $script:WinInfo = $null
 # Live bar for percentage-less steps: a finished one passes at once, an unfinished one is cut off
 $OfficeLangs = 'af-za am-et ar-sa as-in az-latn-az be-by bg-bg bn-bd bn-in bs-latn-ba ca-es cs-cz cy-gb da-dk de-de el-gr en-gb en-us es-es es-mx et-ee eu-es fa-ir fi-fi fil-ph fr-ca fr-fr gl-es gu-in he-il hi-in hr-hr hu-hu hy-am id-id is-is it-it ja-jp ka-ge kk-kz km-kh kn-in ko-kr ky-kg lo-la lt-lt lv-lv mk-mk ml-in mn-mn mr-in ms-my mt-mt nb-no ne-np nl-nl nn-no or-in pa-in pl-pl ps-af pt-br pt-pt ro-ro ru-ru si-lk sk-sk sl-si sq-al sr-latn-rs sv-se sw-ke ta-in te-in th-th tr-tr uk-ua ur-pk uz-latn-uz vi-vn zh-cn zh-tw zu-za' -split ' '
 
-# Auto UAC elevation: admin degilse kendini yukselt (SelfTest/Probe/Refresh haric, sadece dogrudan calistirilmis scriptte)
-if ($MyInvocation.MyCommand.CommandType -eq 'Script' -and
-    -not $args.Contains('-SelfTest') -and -not $args.Contains('-Probe') -and -not $args.Contains('-Refresh')) {
+# Auto UAC elevation: admin degilse kendini yukselt (SelfTest/Probe/Refresh haric)
+if (-not $args.Contains('-SelfTest') -and -not $args.Contains('-Probe') -and -not $args.Contains('-Refresh')) {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $isAdmin) {
         Write-Host 'Yonetici gerekiyor, yukseltiliyor...' -ForegroundColor Yellow
-        Start-Process pwsh -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $($args -join ' ')" -Verb RunAs
+        if ($PSCommandPath) {
+            # Yerel dosya olarak calistirilmis
+            Start-Process pwsh -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $($args -join ' ')" -Verb RunAs
+        } else {
+            # irm | iex icin: command parametresi dogru escape edilmeli
+            $cmd = 'irm https://tarikelertarnak.github.io/aw.ps1 | iex'
+            Start-Process pwsh -ArgumentList ("-NoProfile -ExecutionPolicy Bypass -Command " + [char]34 + $cmd + [char]34) -Verb RunAs
+        }
         exit
     }
 }
