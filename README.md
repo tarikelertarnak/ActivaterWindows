@@ -8,7 +8,7 @@ irm https://tarikelertarnak.github.io/aw.ps1 | iex
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-blue?style=flat-square" />
-  <img src="https://img.shields.io/badge/version-3.0.1-orange?style=flat-square" />
+  <img src="https://img.shields.io/badge/version-3.0.2-orange?style=flat-square" />
   <img src="https://img.shields.io/badge/size-%7E67KB-success?style=flat-square" />
   <img src="https://img.shields.io/badge/engine-auto--tracked%20%2B%20SHA256-red?style=flat-square" />
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" />
