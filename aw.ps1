@@ -476,14 +476,10 @@ function Warn-AV {
 
 
 function Write-DlBar([long]$Done, [long]$Total, $Sw) {
-    $ratio = if ($Total -gt 0) { [math]::Min(1.0, $Done / $Total) } else { 0.0 }
-    $pct = [int]([math]::Round($ratio * 100))
-    if ($pct -eq $script:_lastPct) { return }
-    $script:_lastPct = $pct
-    $bars = [int]($ratio * 30)
-    $track = ('#' * $bars) + ('-' * (30 - $bars))
-    $el = if ($Sw) { [int]$Sw.Elapsed.TotalSeconds } else { 0 }
-    Write-Host ("`r  [{0}] {1,3}%  {2,3}s" -f $track, $pct, $el) -NoNewline
+    # Yüklenme sırasında sadece mavi spinner (yüzde çubuğu ve saniye kaldırıldı)
+    $spinner = @('|', '/', '-', '\')
+    $tick = ([int]$Sw.Elapsed.TotalMilliseconds / 100) % 4
+    Write-Host ("`r  {0}" -f $spinner[$tick]) -ForegroundColor Cyan -NoNewline
 }
 
 
@@ -776,9 +772,9 @@ function Invoke-MasCmd([string]$Response, [string]$Arguments, [string]$Label, [s
     $sp = @{
         FilePath     = $env:ComSpec
         ArgumentList = "/c """"$file"" -el $Arguments$redir"""
-        Verb         = 'RunAs'
         PassThru     = $true
     }
+    if (-not $isAdmin) { $sp['Verb'] = 'RunAs' }
     if ($hidden) { $sp['WindowStyle'] = 'Hidden' } else { $sp['Wait'] = $true }
     try {
         if ($hidden) {
@@ -1195,20 +1191,22 @@ function Install-OfficeLTSC {
 
     # Kurulu Office tespit et, adini goster, sor
     $removeOffice = $false
+    $skipInstall = $false
     if (Test-OfficeLTSC2024) {
         # Tam olarak LTSC 2024 kurulu
         if (-not (Confirm (T 'office_installed'))) {
-            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
-            return
+            Write-Host '  Kurulum atlandi, etkinlestirmeye devam ediliyor...' -ForegroundColor DarkYellow
+            $skipInstall = $true
+        } else {
+            $removeOffice = $true
         }
-        $removeOffice = $true
     } elseif (Test-OtherOfficeC2R) {
         # Baska bir C2R Office surumu kurulu (M365, 2021, 2019 vs.)
         $detectedName = 'Bilinmeyen Office'
         try {
             foreach ($root in @(
-                'HKLM:\SOFTWARE\Microsoft\OfficeClickToRun\Configuration',
-                'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OfficeClickToRun\Configuration'
+                'HKLM:\\SOFTWARE\\Microsoft\\OfficeClickToRun\\Configuration',
+                'HKLM:\\SOFTWARE\\WOW6432Node\\Microsoft\\OfficeClickToRun\\Configuration'
             )) {
                 $cfg = Get-ItemProperty -Path $root -ErrorAction SilentlyContinue
                 if ($cfg -and $cfg.ProductReleaseIds) {
@@ -1218,10 +1216,21 @@ function Install-OfficeLTSC {
             }
         } catch {}
         if (-not (Confirm ((T 'office_installed_other') -f $detectedName))) {
-            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
-            return
+            Write-Host '  Kurulum atlandi, etkinlestirmeye devam ediliyor...' -ForegroundColor DarkYellow
+            $skipInstall = $true
+        } else {
+            $removeOffice = $true
         }
-        $removeOffice = $true
+
+    }
+
+    if ($skipInstall) {
+        Write-Host ''
+        Write-Host '  Kurulum atlandi, etkinlestirmeye geciliyor...' -ForegroundColor DarkYellow
+        if (-not $SkipActivate) {
+            if (Confirm (T 'office_act_ask')) { Invoke-MasAio '/Ohook' }
+        }
+        return
     }
 
     $work = Join-Path ([IO.Path]::GetTempPath()) "AW_ODT_$(Get-Random)"
