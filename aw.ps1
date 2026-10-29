@@ -9,6 +9,13 @@
 
 $ErrorActionPreference = 'Stop'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+
+function Set-ConsoleTitle([string]$Title = 'ActivaterWindows') {
+    try { [Console]::Title = $Title } catch {}
+    try { $host.UI.RawUI.WindowTitle = $Title } catch {}
+    try { [Console]::Write("`e]0;$Title`a") } catch {}
+}
+Set-ConsoleTitle 'ActivaterWindows'
 $Version  = '3.0.2'
 $Author   = 'TARIK ELER'
 $RepoUrl  = 'https://github.com/tarikelertarnak/ActivaterWindows'
@@ -1611,6 +1618,7 @@ function Show-MainMenu {
             $w.Height = 37
             $host.UI.RawUI.WindowSize = $w
             $host.UI.RawUI.BufferSize = New-Object System.Management.Automation.Host.Size(106, 500)
+            Set-ConsoleTitle 'ActivaterWindows'
         } catch {}
     }
     
