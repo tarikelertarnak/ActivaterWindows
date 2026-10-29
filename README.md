@@ -222,7 +222,7 @@ Every candidate is verified by **file size + PE header** before it is used.
 
 ---
 
-## What's new in v2.5.0
+## What's new in v3.0.2
 
 - **Version bumped to 2.5.0** — polish and finalisation pass (bug fixes, UI tidy-up, proof section)
 - Everything from v2.3.0 stays: Esc back, Windows editions submenu, About screen, made-by credit, shortened one-liner, ODT mirror fallback
@@ -266,7 +266,7 @@ ActivaterWindows/
 The v1.0 Tkinter GUI (`builder/`, `resources/`) is kept as legacy, but it is **no longer developed** and, being a packed `.exe`, it can trigger antivirus heuristics. It is archived only:
 [v1.0.0 (archive)](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v1.0.0).
 
-**The version you should use:** [v2.3.0 — Terminal Edition](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v2.3.0)
+**The version you should use:** [v3.0.2 — Terminal Edition](https://github.com/tarikelertarnak/ActivaterWindows/releases/tag/v3.0.2)
 (the one-liner above). You do not need to download `ActivaterWindows.exe`.
 
 ---
