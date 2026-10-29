@@ -892,19 +892,20 @@ function Test-OtherOfficeC2R {
     $false
 }
 
-# Office kurulum/islem icinde mi? setup.exe, OfficeC2RClient.exe, msiexec gibi
-# prosesler calisiyorsa ODT kurulumu 0-2035 (already installing) hatasi verir.
-function Test-OfficeInstallRunning {
-    $procs = @('setup', 'OfficeC2RClient', 'msiexec', 'clicktorun',
-               'officeclicktorun', 'spvirtualization')
+# Office kurulum/islem cakismalarini kapat (0-2035 onleme).
+# Varsa takili kalmis setup.exe, OfficeC2RClient.exe gibi surecleri sonlandirir.
+function Stop-OfficeInstallConflicts {
+    $procs = @('setup', 'OfficeC2RClient', 'officeclicktorun')
     foreach ($p in $procs) {
-        if (Get-Process -Name $p -ErrorAction SilentlyContinue) { return $true }
+        try {
+            $running = Get-Process -Name $p -ErrorAction SilentlyContinue
+            if ($running) {
+                Write-Host "  Calisan $p islemi kapatiliyor..." -ForegroundColor DarkYellow
+                $running | Stop-Process -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Milliseconds 400
+            }
+        } catch {}
     }
-    try {
-        $svc = Get-Service -Name 'ClickToRunSvc' -ErrorAction SilentlyContinue
-        if ($svc -and $svc.Status -eq 'Running') { return $true }
-    } catch {}
-    $false
 }
 
 # Office Click-to-Run kurulumundan sonra .docx/.xlsx/.pptx gibi dosyalarin cift tikla
@@ -1249,6 +1250,8 @@ function Install-OfficeLTSC {
 
         # Office varsa ODT setup.exe /configure Remove.xml ile kaldir
         if ($removeOffice) {
+            # Once takili kalmis Office sureclerini sonlandir
+            Stop-OfficeInstallConflicts
             Write-Host ''
             Write-Host ('  ' + (T 'office_removing')) -ForegroundColor Cyan
             $removeXml = Join-Path $work 'Remove.xml'
@@ -1296,14 +1299,8 @@ function Install-OfficeLTSC {
             $removeOffice = $false  # bir daha girme
         }
 
-        # Office kurulum/islem zaten calisiyorsa 0-2035 hatasi alinir, engelle.
-        if (Test-OfficeInstallRunning) {
-            Write-Host ''
-            Write-Host (T 'office_install_running') -ForegroundColor Red
-            Write-Host '  Islem iptal edildi.' -ForegroundColor DarkYellow
-            Remove-Item $work -Recurse -Force -ErrorAction SilentlyContinue
-            return
-        }
+        # Varsa calisan/takili kalmis Office kurulum sureclerini temizle (0-2035 onleme)
+        Stop-OfficeInstallConflicts
 
         # 2) Now the questions.
         Write-Host ''
